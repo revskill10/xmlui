@@ -535,7 +535,7 @@ export const NavPanel = memo(forwardRef(function NavPanel(
         [styles.iconsCollapsed]: iconsCollapsed,
         [styles.overlayScroll]: scrollStyle !== "normal",
       })}
-      style={style}
+      style={navUi?.width != null && vertical ? { ...style, ["--xmlui-width-navPanel-App" as any]: `${navUi.width}px` } : style}
     >
       {showLogo && (
         <div className={classnames(styles.logoWrapper)}>{safeLogoContent || <Logo />}</div>
