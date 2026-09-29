@@ -344,13 +344,32 @@ export function normalizePath(url?: string): string | undefined {
   }
   // @ts-ignore
   const prefix = window.__PUBLIC_PATH || "";
-  if (!prefix) {
+  const assetBase = assetBaseUrl();
+  if (!prefix && !assetBase) {
     return url;
   }
-  const prefixWithoutTrailingSlash = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
-  const urlWithoutLeadingSlash = url.startsWith("/") ? url.slice(1) : url;
+  let path = url;
+  if (prefix) {
+    const prefixWithoutTrailingSlash = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+    const urlWithoutLeadingSlash = url.startsWith("/") ? url.slice(1) : url;
+    path = `${prefixWithoutTrailingSlash}/${urlWithoutLeadingSlash}`;
+  }
+  // --- The app's files come from another server than the page (the page stays on its own URL): resolve against it.
+  return assetBase ? `${assetBase}${path.startsWith("/") ? path : `/${path}`}` : path;
+}
 
-  return `${prefixWithoutTrailingSlash}/${urlWithoutLeadingSlash}`;
+/**
+ * Where the app's own files (Main.xmlui, config, components, themes, locale bundles) are served from when that is not
+ * the page's origin: `window.__XMLUI_ASSET_BASE`, an absolute http(s) URL without a trailing slash. Unlike
+ * `__PUBLIC_PATH` it does not change routing: the address bar stays on the page's URL.
+ */
+export function assetBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  // @ts-ignore
+  const base = window.__XMLUI_ASSET_BASE;
+  return typeof base === "string" && /^https?:\/\//.test(base) ? base.replace(/\/+$/, "") : "";
 }
 
 export function isComponentDefChildren(

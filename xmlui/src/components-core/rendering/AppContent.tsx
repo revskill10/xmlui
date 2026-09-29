@@ -25,6 +25,7 @@ import { createLog } from "../appContext/log";
 import { buildAppContextValue, type AppContextDeps } from "../state/appContextFactory";
 import { AppUtilsNamespace, ClipboardNamespace, appCancel, createAppFetch, getAppEnvironment } from "../appContext/app-utils";
 import { createUrlWithQueryParams } from "../../components/component-utils";
+import { normalizePath } from "../utils/misc";
 import { announceLiveRegion, GlobalLiveRegion } from "../../components/LiveRegion/LiveRegionReact";
 import { SkipLink } from "../../components/SkipLink/SkipLinkReact";
 import {
@@ -1063,7 +1064,7 @@ export function AppContent({
     async (input: unknown) => {
       const loadedSourceByLocale = new Map<string, string>();
       const bundles = await resolveLocaleBundleInput(input, async (url) => {
-        const response = await fetch(url);
+        const response = await fetch(normalizePath(url) ?? url);
         if (!response.ok) {
           throw new Error(`Failed to load locale bundle "${url}": ${response.status} ${response.statusText}`);
         }
