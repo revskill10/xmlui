@@ -228,6 +228,18 @@ $gap-content-App: createThemeVar("gap-content-App");
           overflow: hidden;
         }
 
+        // Peek (navPanelPeek): the column keeps the collapsed width while the panel opens over the content.
+        &.navPanelWrapperCollapsed.navPanelWrapperPeek {
+          overflow: visible;
+          z-index: 20;
+
+          > .navPanelWrapper {
+            width: $width-navPanel-App;
+            min-width: $width-navPanel-App;
+            box-shadow: 4px 0 16px rgb(0 0 0 / 18%);
+          }
+        }
+
         // Hide on small screens
         @include t.withMaxScreenSize(0) {
           display: none;
