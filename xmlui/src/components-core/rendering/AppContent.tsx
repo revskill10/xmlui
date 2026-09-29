@@ -206,7 +206,17 @@ export function AppContent({
   const [directionOverride, setDirectionOverride] = useState<"ltr" | "rtl" | "auto">("auto");
   // --- Runtime API endpoint (App.setApiConfig): replaces `apiUrl` / `apiHeaders` from the configuration while set,
   // e.g. an app whose records live behind different servers switches the base when the user switches record owner.
-  const [apiOverride, setApiOverride] = useState<{ apiUrl?: string; apiHeaders?: Record<string, string> } | null>(null);
+  // The page may supply the initial value (window.__XMLUI_API_CONFIG, e.g. rendered by the server that serves the page),
+  // so the very first request already goes to the right server.
+  const [apiOverride, setApiOverride] = useState<{ apiUrl?: string; apiHeaders?: Record<string, string> } | null>(() => {
+    const initial = typeof window !== "undefined" ? (window as any).__XMLUI_API_CONFIG : undefined;
+    return initial && typeof initial === "object" && (typeof initial.apiUrl === "string" || typeof initial.apiHeaders === "object")
+      ? {
+          ...(typeof initial.apiUrl === "string" && { apiUrl: initial.apiUrl }),
+          ...(initial.apiHeaders && typeof initial.apiHeaders === "object" && { apiHeaders: { ...initial.apiHeaders } }),
+        }
+      : null;
+  });
   const [schedulerOverride, setSchedulerOverride] = useState<"concurrent" | "fifo" | undefined>();
   const [maxQueuedPerTraceOverride, setMaxQueuedPerTraceOverride] = useState<number | undefined>();
   const bundleStoreRef = useRef(createBundleStore([xmluiEnglishBundle]));
