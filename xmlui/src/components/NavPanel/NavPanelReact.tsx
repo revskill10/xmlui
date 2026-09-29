@@ -260,6 +260,8 @@ import { defaultProps } from "./NavPanel.defaults";
 
 interface INavPanelContext {
   inDrawer: boolean;
+  /** The side panel is collapsed to icons: its NavLinks render icon-only with the label as tooltip. */
+  iconsOnly?: boolean;
 }
 
 export const NavPanelContext = React.createContext<INavPanelContext | null>(null);
@@ -267,6 +269,8 @@ export const NavPanelContext = React.createContext<INavPanelContext | null>(null
 const contextValue = {
   inDrawer: true,
 };
+const SIDE_CONTEXT: INavPanelContext = { inDrawer: false };
+const SIDE_ICONS_CONTEXT: INavPanelContext = { inDrawer: false, iconsOnly: true };
 
 function scrollElementIntoNavPanelView(
   element: Element,
@@ -481,7 +485,10 @@ export const NavPanel = memo(forwardRef(function NavPanel(
     appLayoutContext?.layout === "vertical" || appLayoutContext?.layout === "vertical-sticky";
   const isCondensed = appLayoutContext?.layout?.startsWith("condensed");
   const vertical = appLayoutContext?.layout?.startsWith("vertical");
-  const collapsed = !!appLayoutContext?.navPanelCollapsed && vertical;
+  // A peeking panel shows its full content over the page; `icons` keeps the content (links as icons).
+  const navUi = appLayoutContext?.navPanelUi;
+  const collapsed = !!appLayoutContext?.navPanelCollapsed && vertical && !navUi?.peeking;
+  const iconsCollapsed = collapsed && navUi?.collapseMode === "icons";
   const safeLogoContent = logoContent || renderChild(appLayoutContext?.logoContentDef);
   // Footer only in vertical layouts: vertical, vertical-sticky, vertical-full-header
   const hasFooter = !!footerContent && vertical;
@@ -512,7 +519,9 @@ export const NavPanel = memo(forwardRef(function NavPanel(
     );
   }
 
+  const sideContext = iconsCollapsed ? SIDE_ICONS_CONTEXT : SIDE_CONTEXT;
   const wrapperEl = (
+    <NavPanelContext.Provider value={sideContext}>
     <div
       {...rest}
       ref={mergedRef}
@@ -522,7 +531,8 @@ export const NavPanel = memo(forwardRef(function NavPanel(
         [styles.vertical]: vertical,
         [styles.condensed]: isCondensed,
         [styles.hasFooter]: hasFooter,
-        [styles.collapsed]: collapsed,
+        [styles.collapsed]: collapsed && !iconsCollapsed,
+        [styles.iconsCollapsed]: iconsCollapsed,
         [styles.overlayScroll]: scrollStyle !== "normal",
       })}
       style={style}
@@ -550,6 +560,7 @@ export const NavPanel = memo(forwardRef(function NavPanel(
         </Part>
       )}
     </div>
+    </NavPanelContext.Provider>
   );
 
   return wrapperEl;

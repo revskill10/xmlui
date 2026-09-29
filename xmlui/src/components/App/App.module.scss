@@ -458,6 +458,35 @@ $gap-content-App: createThemeVar("gap-content-App");
         width: $width-navPanel-App;
         min-width: $width-navPanel-App;
       }
+
+      // Peek: the collapsed column keeps its width (the page does not move) while the panel opens over the content.
+      &.navPanelWrapperPeek {
+        overflow: visible;
+        z-index: 20;
+
+        > .navPanelWrapper {
+          box-shadow: 4px 0 16px rgb(0 0 0 / 18%);
+        }
+      }
+    }
+
+    // Drag handle on the edge of an expanded, resizable panel.
+    .navPanelResizer {
+      position: absolute;
+      top: 0;
+      right: -3px;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 5;
+      touch-action: none;
+      outline: none;
+
+      &:hover,
+      &:focus-visible {
+        background-color: currentColor;
+        opacity: 0.25;
+      }
     }
   }
 

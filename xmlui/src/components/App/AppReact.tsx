@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import type { JSX } from "react/jsx-runtime";
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { Helmet } from "react-helmet-async";
 import { useLocation, useNavigationType } from "react-router-dom";
 import { noop, debounce } from "lodash-es";
@@ -33,7 +34,7 @@ import { Sheet, SheetContent } from "./Sheet";
 import { AppContextAwareAppHeader } from "../AppHeader/AppHeaderReact";
 import { AppHeaderMd } from "../AppHeader/AppHeader";
 import { useComponentThemeClass } from "../../components-core/theming/utils";
-import type { AppLayoutType, IAppLayoutContext } from "../App/AppLayoutContext";
+import type { AppLayoutType, IAppLayoutContext, NavPanelUi } from "../App/AppLayoutContext";
 import { AppLayoutContext } from "../App/AppLayoutContext";
 import { SearchContextProvider } from "./SearchContext";
 import type { NavHierarchyNode } from "../NavPanel/NavPanelReact";
@@ -112,6 +113,13 @@ type Props = {
   persistTheme?: boolean;
   toneStorageKey?: string;
   themeStorageKey?: string;
+  navPanelCollapseMode?: "hidden" | "icons";
+  persistNavPanel?: boolean;
+  navPanelStorageKey?: string;
+  navPanelPeek?: boolean;
+  navPanelResizable?: boolean;
+  navPanelMinWidth?: number;
+  navPanelMaxWidth?: number;
   locale?: string;
   localeBundles?: unknown;
   auditPolicy?: unknown;
@@ -163,6 +171,13 @@ export const App = memo(function App({
   persistTheme = defaultProps.persistTheme,
   toneStorageKey = defaultProps.toneStorageKey,
   themeStorageKey = defaultProps.themeStorageKey,
+  navPanelCollapseMode = defaultProps.navPanelCollapseMode,
+  persistNavPanel = defaultProps.persistNavPanel,
+  navPanelStorageKey = defaultProps.navPanelStorageKey,
+  navPanelPeek = defaultProps.navPanelPeek,
+  navPanelResizable = defaultProps.navPanelResizable,
+  navPanelMinWidth = defaultProps.navPanelMinWidth,
+  navPanelMaxWidth = defaultProps.navPanelMaxWidth,
   locale,
   localeBundles,
   auditPolicy,
@@ -344,6 +359,63 @@ export const App = memo(function App({
   const footerSize = useElementSizeObserver();
   const headerSize = useElementSizeObserver();
 
+  // The saved side-panel state ({ collapsed, width }) when `persistNavPanel` is on.
+  const savedNavPanel = useMemo(() => {
+    if (!persistNavPanel || typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(navPanelStorageKey);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? (parsed as { collapsed?: boolean; width?: number | null }) : null;
+    } catch {
+      return null;
+    }
+    // Read once: later changes are written, not re-read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [navPanelCollapsed, setNavPanelCollapsedState] = useState(!!savedNavPanel?.collapsed);
+  const [navPanelPeeking, setNavPanelPeeking] = useState(false);
+  const clampWidth = useCallback(
+    (w: number) => Math.round(Math.min(navPanelMaxWidth, Math.max(navPanelMinWidth, w))),
+    [navPanelMaxWidth, navPanelMinWidth],
+  );
+  const [navPanelWidth, setNavPanelWidthState] = useState<number | null>(
+    navPanelResizable && typeof savedNavPanel?.width === "number" ? savedNavPanel.width : null,
+  );
+  const setNavPanelWidth = useCallback(
+    (w: number | null) => setNavPanelWidthState(w === null ? null : clampWidth(w)),
+    [clampWidth],
+  );
+  const setNavPanelCollapsed = useCallback((collapsed: boolean) => {
+    setNavPanelCollapsedState(collapsed);
+    setNavPanelPeeking(false);
+  }, []);
+  const toggleNavPanelCollapsed = useCallback(() => {
+    setNavPanelCollapsedState((prev) => !prev);
+    setNavPanelPeeking(false);
+  }, []);
+  useEffect(() => {
+    if (!persistNavPanel || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(navPanelStorageKey, JSON.stringify({ collapsed: navPanelCollapsed, width: navPanelWidth }));
+    } catch {
+      // Storage may be unavailable (private mode): the state simply is not remembered.
+    }
+  }, [persistNavPanel, navPanelStorageKey, navPanelCollapsed, navPanelWidth]);
+  const navPanelUi = useMemo(
+    () => ({
+      collapseMode: navPanelCollapseMode === "icons" ? ("icons" as const) : ("hidden" as const),
+      peekEnabled: navPanelPeek,
+      peeking: navPanelPeek && navPanelCollapsed && navPanelPeeking,
+      setPeeking: setNavPanelPeeking,
+      resizable: navPanelResizable,
+      width: navPanelWidth,
+      setWidth: setNavPanelWidth,
+      minWidth: navPanelMinWidth,
+      maxWidth: navPanelMaxWidth,
+    }),
+    [navPanelCollapseMode, navPanelPeek, navPanelCollapsed, navPanelPeeking, navPanelResizable, navPanelWidth, setNavPanelWidth, navPanelMinWidth, navPanelMaxWidth],
+  );
+
   const styleWithHelpers = useMemo(() => {
     // Determine if we need header/footer height compensation for sticky layouts
     // Non-sticky layouts with whole-page scroll don't need height compensation
@@ -359,8 +431,11 @@ export const App = memo(function App({
       "--header-abs-height": headerSize.height + "px",
       "--footer-abs-height": footerSize.height + "px",
       "--scrollbar-width": noScrollbarGutters ? "0px" : scrollbarWidth + "px",
+      // A dragged NavPanel width overrides the theme width for the whole layout.
+      ...(navPanelWidth !== null ? { "--xmlui-width-navPanel-App": `${navPanelWidth}px` } : {}),
     } as CSSProperties;
   }, [
+    navPanelWidth,
     footerSize.height,
     headerSize.height,
     noScrollbarGutters,
@@ -392,13 +467,6 @@ export const App = memo(function App({
     safeLayout,
   );
 
-  const [navPanelCollapsed, setNavPanelCollapsedState] = useState(false);
-  const setNavPanelCollapsed = useCallback((collapsed: boolean) => {
-    setNavPanelCollapsedState(collapsed);
-  }, []);
-  const toggleNavPanelCollapsed = useCallback(() => {
-    setNavPanelCollapsedState((prev) => !prev);
-  }, []);
 
   useIsomorphicLayoutEffect(() => {
     if (window.history.scrollRestoration !== "manual") {
@@ -498,6 +566,7 @@ export const App = memo(function App({
     scrollWholePage,
     isNested: appGlobals?.isNested || false,
     setScrollRestorationEnabled,
+    navPanelUi,
   });
 
   const linkInfoContextValue = useMemo(() => {
@@ -622,13 +691,16 @@ export const App = memo(function App({
           {renderHeaderSlot()}
           <div className={styles.mainContentRow}>
             {navPanelVisible && (
-              <aside
+              <NavPanelAside
+                collapsed={navPanelCollapsed}
+                ui={navPanelUi}
                 className={classnames(styles.navPanelWrapper, {
                   [styles.navPanelWrapperCollapsed]: navPanelCollapsed,
+                  [styles.navPanelWrapperPeek]: navPanelUi.peeking,
                 })}
               >
                 <AppNavPanelSlot>{navPanel}</AppNavPanelSlot>
-              </aside>
+              </NavPanelAside>
             )}
             <main className={styles.mainContentArea}>{renderPagesSlot()}</main>
           </div>
@@ -947,6 +1019,99 @@ const layoutConfigs: Record<AppLayoutType, LayoutConfig> = {
   },
 };
 
+/**
+ * The side column of the vertical-full-header layout: hover/focus peek when collapsed, and a drag handle (pointer and
+ * arrow keys; double-click resets) when resizable and expanded.
+ */
+function NavPanelAside({
+  collapsed,
+  ui,
+  className,
+  children,
+}: {
+  collapsed: boolean;
+  ui: NavPanelUi;
+  className: string;
+  children: ReactNode;
+}) {
+  const asideRef = useRef<HTMLElement | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => clear, []);
+  const canPeek = ui.peekEnabled && collapsed;
+  const open = () => {
+    if (!canPeek) return;
+    clear();
+    timer.current = setTimeout(() => ui.setPeeking(true), 120);
+  };
+  const close = () => {
+    clear();
+    if (ui.peeking) ui.setPeeking(false);
+  };
+  const dragging = useRef(false);
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragging.current = true;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragging.current || !asideRef.current) return;
+    ui.setWidth(e.clientX - asideRef.current.getBoundingClientRect().left);
+  };
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    dragging.current = false;
+    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+  };
+  const current = () => ui.width ?? asideRef.current?.getBoundingClientRect().width ?? ui.minWidth;
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 48 : 16;
+    if (e.key === "ArrowLeft") ui.setWidth(current() - step);
+    else if (e.key === "ArrowRight") ui.setWidth(current() + step);
+    else if (e.key === "Home") ui.setWidth(ui.minWidth);
+    else if (e.key === "End") ui.setWidth(ui.maxWidth);
+    else return;
+    e.preventDefault();
+  };
+  return (
+    <aside
+      ref={asideRef}
+      className={className}
+      data-nav-collapsed={collapsed ? "true" : undefined}
+      data-nav-peeking={ui.peeking ? "true" : undefined}
+      onMouseEnter={open}
+      onMouseLeave={close}
+      onFocus={open}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) close();
+      }}
+    >
+      {children}
+      {ui.resizable && !collapsed && (
+        <div
+          className={styles.navPanelResizer}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize navigation"
+          aria-valuemin={ui.minWidth}
+          aria-valuemax={ui.maxWidth}
+          aria-valuenow={Math.round(ui.width ?? 0) || undefined}
+          tabIndex={0}
+          data-testid="nav-panel-resizer"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onDoubleClick={() => ui.setWidth(null)}
+          onKeyDown={onKeyDown}
+        />
+      )}
+    </aside>
+  );
+}
+
 function useAppLayoutContextValue({
   hasRegisteredNavPanel,
   hasRegisteredHeader,
@@ -969,6 +1134,7 @@ function useAppLayoutContextValue({
   scrollWholePage,
   isNested,
   setScrollRestorationEnabled,
+  navPanelUi,
 }: {
   hasRegisteredNavPanel: boolean;
   hasRegisteredHeader: boolean;
@@ -991,6 +1157,7 @@ function useAppLayoutContextValue({
   scrollWholePage: boolean;
   isNested: boolean;
   setScrollRestorationEnabled: (enabled: boolean) => void;
+  navPanelUi: NavPanelUi;
 }): IAppLayoutContext {
   return useMemo<IAppLayoutContext>(
     () => ({
@@ -1016,6 +1183,7 @@ function useAppLayoutContextValue({
       isFullVerticalWidth: false,
       isNested,
       setScrollRestorationEnabled,
+      navPanelUi,
     }),
     [
       hasRegisteredNavPanel,
@@ -1039,6 +1207,7 @@ function useAppLayoutContextValue({
       scrollWholePage,
       isNested,
       setScrollRestorationEnabled,
+      navPanelUi,
     ],
   );
 }

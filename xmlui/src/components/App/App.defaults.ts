@@ -8,4 +8,11 @@ export const defaultProps = {
   persistTheme: false,
   toneStorageKey: "appTone",
   themeStorageKey: "appTheme",
+  navPanelCollapseMode: "hidden" as "hidden" | "icons",
+  persistNavPanel: false,
+  navPanelStorageKey: "appNavPanel",
+  navPanelPeek: false,
+  navPanelResizable: false,
+  navPanelMinWidth: 200,
+  navPanelMaxWidth: 480,
 };

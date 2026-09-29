@@ -133,6 +133,51 @@ export const AppMd = createMetadata({
       defaultValue: defaultProps.toneStorageKey,
       isInternal: true,
     },
+    navPanelCollapseMode: {
+      description:
+        "How a collapsed `NavPanel` looks in vertical layouts: `hidden` shows only its footer strip; " +
+        "`icons` keeps each `NavLink` as its icon (the label becomes a tooltip). Custom content can read " +
+        "`<navPanelId>.collapsed`.",
+      valueType: "string",
+      availableValues: ["hidden", "icons"],
+      defaultValue: defaultProps.navPanelCollapseMode,
+    },
+    persistNavPanel: {
+      description:
+        "When `true`, the NavPanel's collapsed state and dragged width are saved to `localStorage` " +
+        "(under `navPanelStorageKey`) and restored on the next visit.",
+      valueType: "boolean",
+      defaultValue: defaultProps.persistNavPanel,
+    },
+    navPanelStorageKey: {
+      description: "The `localStorage` key used when `persistNavPanel` is `true`.",
+      valueType: "string",
+      defaultValue: defaultProps.navPanelStorageKey,
+    },
+    navPanelPeek: {
+      description:
+        "When `true`, hovering or focusing a collapsed NavPanel opens it over the page content " +
+        "(the content does not move); leaving it collapses it again.",
+      valueType: "boolean",
+      defaultValue: defaultProps.navPanelPeek,
+    },
+    navPanelResizable: {
+      description:
+        "When `true`, the expanded NavPanel has a drag handle on its edge (also keyboard-operable with the arrow " +
+        "keys; double-click resets to the theme width).",
+      valueType: "boolean",
+      defaultValue: defaultProps.navPanelResizable,
+    },
+    navPanelMinWidth: {
+      description: "The smallest width (px) the NavPanel can be dragged to.",
+      valueType: "number",
+      defaultValue: defaultProps.navPanelMinWidth,
+    },
+    navPanelMaxWidth: {
+      description: "The largest width (px) the NavPanel can be dragged to.",
+      valueType: "number",
+      defaultValue: defaultProps.navPanelMaxWidth,
+    },
     locale: {
       description:
         "BCP-47 locale override for the app. Use this to set the active locale from markup; " +
@@ -407,6 +452,13 @@ function AppNode({
       persistTheme={extractValue.asOptionalBoolean(node.props.persistTheme, false)}
       themeStorageKey={extractValue(node.props.themeStorageKey) ?? defaultProps.themeStorageKey}
       toneStorageKey={extractValue(node.props.toneStorageKey) ?? defaultProps.toneStorageKey}
+      navPanelCollapseMode={extractValue.asOptionalString(node.props.navPanelCollapseMode, defaultProps.navPanelCollapseMode) as "hidden" | "icons"}
+      persistNavPanel={extractValue.asOptionalBoolean(node.props.persistNavPanel, defaultProps.persistNavPanel)}
+      navPanelStorageKey={extractValue(node.props.navPanelStorageKey) ?? defaultProps.navPanelStorageKey}
+      navPanelPeek={extractValue.asOptionalBoolean(node.props.navPanelPeek, defaultProps.navPanelPeek)}
+      navPanelResizable={extractValue.asOptionalBoolean(node.props.navPanelResizable, defaultProps.navPanelResizable)}
+      navPanelMinWidth={extractValue.asOptionalNumber(node.props.navPanelMinWidth, defaultProps.navPanelMinWidth)}
+      navPanelMaxWidth={extractValue.asOptionalNumber(node.props.navPanelMaxWidth, defaultProps.navPanelMaxWidth)}
       locale={extractValue.asOptionalString(node.props.locale)}
       localeBundles={extractValue(node.props.localeBundles)}
       auditPolicy={extractValue(node.props.auditPolicy)}

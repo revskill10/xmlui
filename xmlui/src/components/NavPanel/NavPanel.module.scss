@@ -167,6 +167,12 @@ $themeVars: t.composePaddingVars($themeVars, "footer-#{$component}") !global;
     }
   }
 
+  // Collapsed to icons: the content stays (NavLinks render icon-only); only the horizontal overflow is clipped.
+  .wrapper.iconsCollapsed {
+    overflow-x: hidden;
+    padding-inline: 0;
+  }
+
   .wrapper.collapsed {
     overflow: hidden;
     justify-content: flex-end;

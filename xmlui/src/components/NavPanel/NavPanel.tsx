@@ -5,7 +5,8 @@ import { parseScssVar } from "../../components-core/theming/themeVars";
 import { createMetadata, dComponent } from "../metadata-helpers";
 import { defaultProps } from "./NavPanel.defaults";
 import { NavPanel, buildNavHierarchy } from "./NavPanelReact";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useAppLayoutContext } from "../App/AppLayoutContext";
 import type { ComponentDef } from "../../abstractions/ComponentDefs";
 
 const COMP = "NavPanel";
@@ -188,6 +189,22 @@ export const NavPanelMd = createMetadata({
     "for NavLink and NavGroup components that create your application's primary " +
     "navigation menu. Its appearance and behavior automatically adapt based on the " +
     "App's layout configuration.",
+  apis: {
+    collapsed: {
+      description:
+        "`true` while the panel is collapsed in a vertical layout (and not peeking). Custom content can use it, " +
+        "e.g. `when=\"{!nav.collapsed}\"` on a heading that has no icon form.",
+      signature: "collapsed: boolean",
+    },
+    toggleCollapsed: {
+      description: "Collapses an expanded panel or expands a collapsed one (vertical layouts).",
+      signature: "toggleCollapsed(): void",
+    },
+    setCollapsed: {
+      description: "Collapses (`true`) or expands (`false`) the panel (vertical layouts).",
+      signature: "setCollapsed(collapsed: boolean): void",
+    },
+  },
   parts: {
     logo: {
       description: "The logo area within the NavPanel component.",
@@ -291,7 +308,22 @@ function NavPanelWithBuiltNavHierarchy({
   layoutContext,
   extractValue,
   appContext,
+  updateState,
+  registerComponentApi,
 }) {
+  // Markup reads `<id>.collapsed` and calls `<id>.toggleCollapsed()` / `<id>.setCollapsed(v)`.
+  const layout = useAppLayoutContext();
+  const vertical = !!layout?.layout?.startsWith("vertical");
+  const collapsed = vertical && !!layout?.navPanelCollapsed && !layout?.navPanelUi?.peeking;
+  useEffect(() => {
+    updateState?.({ collapsed });
+  }, [collapsed, updateState]);
+  useEffect(() => {
+    registerComponentApi?.({
+      toggleCollapsed: () => layout?.toggleNavPanelCollapsed(),
+      setCollapsed: (value: boolean) => layout?.setNavPanelCollapsed(!!value),
+    });
+  }, [registerComponentApi, layout]);
   const effectiveChildren = useMemo(() => {
     return resolveNavSectionChildren(
       node.children as ComponentDef[] | undefined,
@@ -364,6 +396,8 @@ export const navPanelRenderer = wrapComponent(COMP, NavPanel, NavPanelMd, {
       layoutContext={context.layoutContext}
       extractValue={context.extractValue}
       appContext={context.appContext}
+      updateState={context.updateState}
+      registerComponentApi={context.registerComponentApi}
     />
   ),
 });

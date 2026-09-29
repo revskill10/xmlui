@@ -57,6 +57,22 @@ export const appLayoutMd: readonly PropertyValueDescription[] = [
 export const appLayouts: string[] = [...appLayoutNames];
 export type AppLayoutType = (typeof appLayoutNames)[number];
 
+/** Side-panel behaviour in vertical layouts (collapse style, hover peek, resizing). */
+export interface NavPanelUi {
+  /** `hidden`: a collapsed panel shows only its footer strip; `icons`: links keep their icons (labels as tooltips). */
+  collapseMode: "hidden" | "icons";
+  /** When collapsed, hovering (or focusing) the panel opens it over the content without moving the page. */
+  peekEnabled: boolean;
+  peeking: boolean;
+  setPeeking: (peeking: boolean) => void;
+  resizable: boolean;
+  /** Width set by dragging the panel edge (px); null = the theme width. */
+  width: number | null;
+  setWidth: (width: number | null) => void;
+  minWidth: number;
+  maxWidth: number;
+}
+
 export interface IAppLayoutContext {
   layout: AppLayoutType;
   navPanelVisible: boolean;
@@ -80,6 +96,7 @@ export interface IAppLayoutContext {
   isFullVerticalWidth?: boolean;
   isNested?: boolean;
   setScrollRestorationEnabled?: (enabled: boolean) => void;
+  navPanelUi?: NavPanelUi;
 }
 
 export const AppLayoutContext = createContext<IAppLayoutContext | null>(null);

@@ -108,8 +108,9 @@ export const NavGroup = memo(forwardRef(function NavGroup(
     appLayoutContext?.layout === "vertical-sticky" ||
     appLayoutContext?.layout === "vertical-full-header";
 
-  if (navPanelContext !== null) {
-    inline = navPanelContext.inDrawer;
+  // Inside the drawer groups are always inline; the side panel keeps the layout's choice.
+  if (navPanelContext?.inDrawer) {
+    inline = true;
   }
 
   const navGroupContextValue = useMemo(() => {

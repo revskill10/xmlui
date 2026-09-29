@@ -67,6 +67,9 @@ export const NavLink = memo(forwardRef(function NavLink(
     !!appLayoutContext && getAppLayoutOrientation(appLayoutContext.layout).includes("vertical");
   const navPanelContext = useContext(NavPanelContext);
   const inDrawer = navPanelContext?.inDrawer;
+  // The side NavPanel is collapsed to icons: show the icon, keep the label for assistive tech and as a tooltip.
+  const iconOnly = !!navPanelContext?.iconsOnly;
+  const labelText = typeof children === "string" ? children : undefined;
 
   const { level: contextLevel } = useContext(NavGroupContext);
   const effectiveLevel = levelProp ?? contextLevel;
@@ -97,6 +100,7 @@ export const NavLink = memo(forwardRef(function NavLink(
     [styles.level2]: effectiveLevel === 1,
     [styles.level3]: effectiveLevel === 2,
     [styles.level4]: effectiveLevel === 3,
+    [styles.iconOnly]: iconOnly,
   });
 
   let innerContent = (
@@ -109,9 +113,14 @@ export const NavLink = memo(forwardRef(function NavLink(
       })}
     >
       {icon}
-      {children}
+      {iconOnly ? (
+        icon ? <span className={styles.visuallyHidden}>{children}</span> : <span>{labelText ? labelText.slice(0, 2) : children}</span>
+      ) : (
+        children
+      )}
     </div>
   );
+  const iconOnlyProps = iconOnly && labelText ? { title: labelText, "aria-label": labelText } : {};
   let content: React.ReactNode = null;
   if (disabled || !smartTo) {
     content = (
@@ -122,6 +131,7 @@ export const NavLink = memo(forwardRef(function NavLink(
         className={baseClasses}
         style={styleObj}
         disabled={disabled}
+        {...iconOnlyProps}
       >
         {innerContent}
       </button>
@@ -136,6 +146,7 @@ export const NavLink = memo(forwardRef(function NavLink(
         end={exact}
         style={styleObj}
         onClick={onClick}
+        {...iconOnlyProps}
         className={({ isActive }) =>
           classnames(baseClasses, {
             [styles.displayActive]: displayActive,
