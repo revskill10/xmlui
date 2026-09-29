@@ -74,6 +74,8 @@ export type ApiActionOptions = {
 interface RestAPIAdapterPropsV2 {
   apiUrl: string;
   headers?: Record<string, string>;
+  /** Sent only with requests resolved against `apiUrl` (relative URLs), never with absolute ones. */
+  apiHeaders?: Record<string, string>;
   errorResponseTransform?: string;
 }
 
@@ -315,7 +317,7 @@ export default class RestApiProxy {
 
   constructor(appContext?: AppContextObject, apiInstance?: IApiInterceptor) {
     const conf = { ...(appContext?.appGlobals ?? {}), ...(appContext?.xmluiConfig ?? {}) };
-    const { apiUrl, errorResponseTransform } = conf;
+    const { apiUrl, apiHeaders, errorResponseTransform } = conf;
     this.appContext = appContext;
     this.apiInstance = apiInstance;
 
@@ -325,6 +327,7 @@ export default class RestApiProxy {
       headers: {
         ...conf.headers,
       },
+      apiHeaders: { ...(apiHeaders ?? {}) },
     };
   }
 
@@ -657,7 +660,11 @@ export default class RestApiProxy {
     const hasBody = body !== undefined;
 
     const aggregatedHeaders = omitBy(
-      { ...(hasBody ? this.getHeaders() : headersWithoutContentType), ...headers },
+      {
+        ...(hasBody ? this.getHeaders() : headersWithoutContentType),
+        ...(this.resolvesAgainstApiUrl(relativePath) ? this.config.apiHeaders : {}),
+        ...headers,
+      },
       isUndefined,
     ) as Record<string, string>;
     if (includeClientTxId) {
@@ -758,6 +765,17 @@ export default class RestApiProxy {
   private tryParseResponse = async (response: Response, logError = false) => {
     return await parseResponseBody(response, logError);
   };
+
+  /** Whether a request URL is resolved against `apiUrl` (relative) rather than used as given (absolute). */
+  public resolvesAgainstApiUrl(relativePath: string | undefined): boolean {
+    const path = relativePath ?? "";
+    return !(path.startsWith("http://") || path.startsWith("https://"));
+  }
+
+  /** Whether requests to this URL carry `apiHeaders` (a non-empty set, and a URL resolved against `apiUrl`). */
+  public carriesApiHeaders(relativePath: string | undefined): boolean {
+    return Object.keys(this.config.apiHeaders ?? {}).length > 0 && this.resolvesAgainstApiUrl(relativePath);
+  }
 
   private generateFullApiUrl(relativePath: string, queryParams: Record<string, any> | undefined) {
     const { baseUrl: basePath, mergedParams } = normalizeUrlAndParams(relativePath, queryParams);

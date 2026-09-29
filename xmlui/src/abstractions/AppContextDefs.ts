@@ -362,6 +362,12 @@ export type AppContextObject = {
     setLocale: (locale: string, options?: { source?: "app" | "user" }) => void;
     /** Internal: used by AppReact to push the `direction` prop into AppContext. */
     setAppDirection: (dir: "ltr" | "rtl" | "auto") => void;
+    /**
+     * Replaces `apiUrl` and/or `apiHeaders` of the configuration at runtime (null restores the configured values).
+     * `apiHeaders` are sent only with requests resolved against `apiUrl` (relative URLs), never with absolute ones.
+     * Data loaded through another `apiUrl` is cached separately.
+     */
+    setApiConfig: (config: { apiUrl?: string; apiHeaders?: Record<string, string> } | null) => void;
     registerLocaleBundle: (bundle: {
       locale: string;
       messages: ReadonlyMap<string, string> | Record<string, string>;

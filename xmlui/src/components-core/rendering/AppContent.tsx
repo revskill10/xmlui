@@ -203,6 +203,9 @@ export function AppContent({
   const [appLocaleOverride, setAppLocaleOverride] = useState<string | undefined>();
   const [userLocaleOverride, setUserLocaleOverride] = useState<string | undefined>();
   const [directionOverride, setDirectionOverride] = useState<"ltr" | "rtl" | "auto">("auto");
+  // --- Runtime API endpoint (App.setApiConfig): replaces `apiUrl` / `apiHeaders` from the configuration while set,
+  // e.g. an app whose records live behind different servers switches the base when the user switches record owner.
+  const [apiOverride, setApiOverride] = useState<{ apiUrl?: string; apiHeaders?: Record<string, string> } | null>(null);
   const [schedulerOverride, setSchedulerOverride] = useState<"concurrent" | "fifo" | undefined>();
   const [maxQueuedPerTraceOverride, setMaxQueuedPerTraceOverride] = useState<number | undefined>();
   const bundleStoreRef = useRef(createBundleStore([xmluiEnglishBundle]));
@@ -219,10 +222,10 @@ export function AppContent({
   // --- Internal framework consumers read from this view through
   // --- `appContext.xmluiConfig` so apps can keep framework settings under
   // --- either `appGlobals` (legacy) or the new `xmluiConfig` key.
-  const xmluiConfig = useMemo(
-    () => mergeXmluiConfig(appGlobals, xmluiConfigRaw),
-    [appGlobals, xmluiConfigRaw],
-  );
+  const xmluiConfig = useMemo(() => {
+    const merged = mergeXmluiConfig(appGlobals, xmluiConfigRaw);
+    return apiOverride ? { ...merged, ...apiOverride } : merged;
+  }, [appGlobals, xmluiConfigRaw, apiOverride]);
   const scriptExecutionMode = useMemo(
     () => getScriptExecutionMode({ xmluiConfig }),
     [xmluiConfig],
@@ -1715,6 +1718,15 @@ export function AppContent({
       availableLocales,
       setLocale,
       setAppDirection: (dir: "ltr" | "rtl" | "auto") => setDirectionOverride(dir),
+      setApiConfig: (config: { apiUrl?: string; apiHeaders?: Record<string, string> } | null) =>
+        setApiOverride(
+          config && (config.apiUrl !== undefined || config.apiHeaders !== undefined)
+            ? {
+                ...(config.apiUrl !== undefined && { apiUrl: String(config.apiUrl) }),
+                ...(config.apiHeaders !== undefined && { apiHeaders: { ...config.apiHeaders } }),
+              }
+            : null,
+        ),
       registerLocaleBundle,
       registerLocaleBundles,
       reloadLocale,

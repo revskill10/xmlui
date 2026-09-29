@@ -73,6 +73,7 @@ async function download(
     (operation.method && (operation.method as string).toLowerCase() !== "get") ||
     hasOperationHeaders || // if the download needs per-request headers, we can't use the iframe trick
     hasConfigHeaders || //if we have any headers for the api, we can't use the iframe trick
+    api.carriesApiHeaders(resolveBindingExpressions ? extractParam(context, url, appContext) : url) || // the same for apiHeaders on an apiUrl request
     appContext.apiInterceptorContext.isMocked(_url) //if we mock this url, the mock can't work in an iframe, so we must fall back to download it with the restApiProxy
   ) {
     try {
