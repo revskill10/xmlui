@@ -459,6 +459,12 @@ $gap-content-App: createThemeVar("gap-content-App");
         min-width: $width-navPanel-App;
       }
 
+      // Collapsed to icons: the panel itself narrows, so centred icons stay inside the visible column.
+      &.navPanelWrapperIcons:not(.navPanelWrapperPeek) > .navPanelWrapper {
+        width: $width-navPanel-collapsed-App;
+        min-width: $width-navPanel-collapsed-App;
+      }
+
       // Peek: the collapsed column keeps its width (the page does not move) while the panel opens over the content.
       &.navPanelWrapperPeek {
         overflow: visible;

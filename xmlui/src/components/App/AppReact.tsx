@@ -697,6 +697,7 @@ export const App = memo(function App({
                 className={classnames(styles.navPanelWrapper, {
                   [styles.navPanelWrapperCollapsed]: navPanelCollapsed,
                   [styles.navPanelWrapperPeek]: navPanelUi.peeking,
+                  [styles.navPanelWrapperIcons]: navPanelUi.collapseMode === "icons",
                 })}
               >
                 <AppNavPanelSlot>{navPanel}</AppNavPanelSlot>
