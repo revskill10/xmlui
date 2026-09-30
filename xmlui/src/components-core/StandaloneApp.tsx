@@ -11,7 +11,7 @@ import type { ComponentDef, CompoundComponentDef } from "../abstractions/Compone
 
 import "../index.scss";
 import { AppRoot } from "./rendering/AppRoot";
-import { normalizePath } from "./utils/misc";
+import { assetBaseUrl, normalizePath } from "./utils/misc";
 import { ApiInterceptorProvider } from "./interception/ApiInterceptorProvider";
 import { EMPTY_OBJECT } from "./constants";
 import {
@@ -1257,8 +1257,16 @@ async function loadThemeFile(url: string): Promise<ThemeDefinition> {
  * Fetch the up-to-date state of the source file
  * @param url The URL to fetch the source file from
  * @returns The source file contents response
+ *
+ * When the page serves the app's files from an asset base (`window.__XMLUI_ASSET_BASE`), that server owns their
+ * freshness — e.g. versioned URLs cached as immutable, or validators answered with 304 — so the browser's HTTP cache
+ * is used as the server's headers say. Without an asset base (files served in place, typically while editing them),
+ * every load asks for the current file.
  */
 function fetchWithoutCache(url: string): Promise<Response> {
+  if (assetBaseUrl()) {
+    return fetch(normalizePath(url));
+  }
   return fetch(normalizePath(url), {
     headers: {
       "Cache-Control": "no-cache, no-store",
