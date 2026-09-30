@@ -1,8 +1,10 @@
+import { forwardRef, type ComponentProps } from "react";
 import styles from "./IFrame.module.scss";
 
 import { parseScssVar } from "../../components-core/theming/themeVars";
 import { wrapComponent } from "../../components-core/wrapComponent";
 import { createMetadata } from "../metadata-helpers";
+import { normalizePagePath } from "../../components-core/utils/misc";
 import { IFrame } from "./IFrameReact";
 
 const COMP = "IFrame";
@@ -97,8 +99,12 @@ export const IFrameMd = createMetadata({
   },
 });
 
-export const iframeComponentRenderer = wrapComponent(COMP, IFrame, IFrameMd, {
-  resourceUrls: ["src"],
-  strings: ["srcdoc", "allow", "name", "referrerPolicy", "sandbox"],
+// The src of an IFrame is a page, not one of the app's files: it gets the routing prefix but never the asset base.
+const IFramePage = forwardRef<HTMLIFrameElement, ComponentProps<typeof IFrame>>(function IFramePage(props, ref) {
+  return <IFrame {...props} ref={ref} src={normalizePagePath(props.src)} />;
+});
+
+export const iframeComponentRenderer = wrapComponent(COMP, IFramePage, IFrameMd, {
+  strings: ["src", "srcdoc", "allow", "name", "referrerPolicy", "sandbox"],
   exposeRegisterApi: true,
 });

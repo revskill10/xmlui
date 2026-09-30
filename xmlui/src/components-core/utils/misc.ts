@@ -359,6 +359,23 @@ export function normalizePath(url?: string): string | undefined {
 }
 
 /**
+ * A URL of a page (a document the user navigates to, e.g. an IFrame's `src`), resolved like the app's routes: with the
+ * public path prefix, but never with the asset base — the asset base is where the app's files live, not its pages.
+ */
+export function normalizePagePath(url?: string): string | undefined {
+  if (!url || url.startsWith("http://") || url.startsWith("https://") || typeof window === "undefined") {
+    return url || undefined;
+  }
+  // @ts-ignore
+  const prefix: string = window.__PUBLIC_PATH || "";
+  if (!prefix) {
+    return url;
+  }
+  const prefixWithoutTrailingSlash = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+  return `${prefixWithoutTrailingSlash}/${url.startsWith("/") ? url.slice(1) : url}`;
+}
+
+/**
  * Where the app's own files (Main.xmlui, config, components, themes, locale bundles) are served from when that is not
  * the page's origin: `window.__XMLUI_ASSET_BASE`, an absolute http(s) URL without a trailing slash. Unlike
  * `__PUBLIC_PATH` it does not change routing: the address bar stays on the page's URL.
