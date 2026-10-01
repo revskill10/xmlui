@@ -1,9 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import toast, { ToastBar, Toaster } from "react-hot-toast";
 import type { ToasterProps } from "react-hot-toast";
-import { useTheme } from "../../components-core/theming/ThemeContext";
 
 export type NotificationPosition =
   | "top-start"
@@ -22,6 +20,9 @@ const STANDARD_CONTAINER_STYLE: CSSProperties = {
   left: 40,
   position: "absolute",
   overflowY: "hidden",
+  // Above the app surface, below portalled dialogs/popovers. The vendor's
+  // default 9999 would let notifications intercept modal controls.
+  zIndex: 0,
 };
 
 function resolveToasterProps(position: NotificationPosition): {
@@ -57,7 +58,6 @@ export const NotificationToast = ({
   notificationPosition = DEFAULT_NOTIFICATION_POSITION,
 }: NotificationToastProps) => {
   const [shouldRender, setShouldRender] = useState(false);
-  const { root } = useTheme();
 
   useEffect(() => {
     if (!toasterMounted) {
@@ -72,7 +72,10 @@ export const NotificationToast = ({
   if (!shouldRender) return null;
 
   const { position, containerStyle } = resolveToasterProps(notificationPosition);
-  return createPortal(
+  // Keep the notification layer in the app's DOM tree, before the sibling
+  // portal roots. Portalling it to the same root as dialogs makes stacking
+  // depend on mount order (in particular for initially open dialogs).
+  return (
     <Toaster
       position={position}
       containerStyle={containerStyle}
@@ -90,7 +93,6 @@ export const NotificationToast = ({
           </ToastBar>
         </div>
       )}
-    </Toaster>,
-    root,
+    </Toaster>
   );
 };
