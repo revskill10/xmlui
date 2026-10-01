@@ -112,6 +112,36 @@ test("initiallyExpanded works", async ({ initTestBed, page }) => {
   await expect(page.getByRole("menuitem", { name: "inner page 2" })).not.toBeVisible();
 });
 
+test("storageKey restores the expanded state the user left", async ({ initTestBed, page }) => {
+  await page.addInitScript(() => localStorage.setItem("xmlui.navGroup.pages", "1"));
+  await initTestBed(`
+    <App layout="vertical">
+      <NavPanel>
+        <NavGroup label="Pages" storageKey="pages">
+          <NavLink label="Page 1" to="/p1" />
+        </NavGroup>
+      </NavPanel>
+    </App>
+  `);
+  await expect(page.getByRole("link", { name: "Page 1" })).toBeVisible();
+});
+
+test("storageKey remembers the user's toggle", async ({ initTestBed, page }) => {
+  await initTestBed(`
+    <App layout="vertical">
+      <NavPanel>
+        <NavGroup label="Pages" storageKey="pages" initiallyExpanded="true">
+          <NavLink label="Page 1" to="/p1" />
+        </NavGroup>
+      </NavPanel>
+    </App>
+  `);
+  await expect(page.getByRole("link", { name: "Page 1" })).toBeVisible();
+  await page.getByText("Pages").click();
+  await expect(page.getByRole("link", { name: "Page 1" })).not.toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("xmlui.navGroup.pages"))).toBe("0");
+});
+
 test("nested initiallyExpanded works", async ({ initTestBed, page }) => {
   await initTestBed(`
     <Stack testId="stack">

@@ -56,6 +56,8 @@ type Props = {
   node: NavGroupComponentDef;
   renderChild: RenderChildFn;
   initiallyExpanded: boolean;
+  /** Remember the expanded state in localStorage under this key (vertical panels). */
+  storageKey?: string;
   noIndicator?: boolean;
   iconHorizontalExpanded?: string;
   iconHorizontalCollapsed?: string;
@@ -80,6 +82,7 @@ export const NavGroup = memo(forwardRef(function NavGroup(
     to,
     disabled = false,
     initiallyExpanded = false,
+    storageKey,
     noIndicator = defaultProps.noIndicator,
     iconHorizontalCollapsed,
     iconHorizontalExpanded,
@@ -151,6 +154,7 @@ export const NavGroup = memo(forwardRef(function NavGroup(
           renderChild={renderChild}
           ref={ref}
           initiallyExpanded={initiallyExpanded}
+          storageKey={storageKey}
           disabled={disabled}
           noIndicator={noIndicator}
           iconAlignment={iconAlignment}
@@ -188,12 +192,35 @@ type ExpandableNavGroupProps = {
   renderChild: RenderChildFn;
   to?: string;
   initiallyExpanded?: boolean;
+  storageKey?: string;
   disabled?: boolean;
   noIndicator?: boolean;
   iconAlignment?: "baseline" | "start" | "center" | "end";
   expandIconAlignment?: "start" | "end";
   fitContentWidth?: boolean;
 };
+
+const STORAGE_PREFIX = "xmlui.navGroup.";
+
+/** The remembered expanded state, or undefined (no key, nothing stored, or storage unavailable). */
+function readStoredExpanded(storageKey?: string): boolean | undefined {
+  if (!storageKey || typeof window === "undefined") return undefined;
+  try {
+    const value = window.localStorage.getItem(STORAGE_PREFIX + storageKey);
+    return value === "1" ? true : value === "0" ? false : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function storeExpanded(storageKey: string | undefined, expanded: boolean) {
+  if (!storageKey || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_PREFIX + storageKey, expanded ? "1" : "0");
+  } catch {
+    // storage blocked (private mode, quota): the group still toggles, it just is not remembered
+  }
+}
 
 const ExpandableNavGroup = forwardRef(function ExpandableNavGroup(
   {
@@ -206,6 +233,7 @@ const ExpandableNavGroup = forwardRef(function ExpandableNavGroup(
     node,
     to,
     initiallyExpanded = false,
+    storageKey,
     disabled = false,
     noIndicator = false,
     iconAlignment = "center",
@@ -218,7 +246,7 @@ const ExpandableNavGroup = forwardRef(function ExpandableNavGroup(
   const { level, iconVerticalCollapsed, iconVerticalExpanded, layoutIsVertical } =
     useContext(NavGroupContext);
   const { mediaSize } = useAppContext();
-  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [expanded, setExpanded] = useState(() => readStoredExpanded(storageKey) ?? initiallyExpanded);
   const groupContentInnerRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
 
@@ -249,6 +277,8 @@ const ExpandableNavGroup = forwardRef(function ExpandableNavGroup(
     }
     setExpanded((prev) => {
       const newExpanded = !prev;
+      // Only the user's own toggle is remembered; expanding for the active link is not a choice.
+      storeExpanded(storageKey, newExpanded);
       pushXsLog({
         ts: Date.now(),
         perfTs: typeof performance !== "undefined" ? performance.now() : undefined,

@@ -25,6 +25,13 @@ export const NavGroupMd = createMetadata({
         "defined, the group is collapsed by default.",
       valueType: "boolean",
     },
+    storageKey: {
+      description:
+        "When set, the group remembers whether it is expanded in the browser's local storage under " +
+        "this key, so a reload or another page shows it as the user left it. A group holding the " +
+        "active link still expands. Applies to groups in a vertical navigation panel.",
+      valueType: "string",
+    },
     enabled: dEnabled(),
     to: {
       description: `This property defines an optional navigation link.`,
@@ -134,6 +141,7 @@ export const navGroupComponentRenderer = wrapComponent(COMP, NavGroup, NavGroupM
       }
       node={node}
       initiallyExpanded={extractValue.asOptionalBoolean(node.props.initiallyExpanded)}
+      storageKey={extractValue.asOptionalString(node.props.storageKey)}
       noIndicator={extractValue.asOptionalBoolean(node.props.noIndicator)}
       renderChild={renderChild}
       iconHorizontalExpanded={extractValue.asOptionalString(node.props.iconHorizontalExpanded)}
