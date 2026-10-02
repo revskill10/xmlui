@@ -78,15 +78,33 @@ export function Theme({
         `Theme not found: requested="${id}", available=[${themes.map((t) => t.id).join(", ")}]`,
       );
     }
+    // A Theme that sets a base colour (e.g. `color-primary`) defines that colour: the shades the extended theme states
+    // explicitly for it (`color-primary-50` … `-900`) give way to the ones generated from the new base, unless this
+    // Theme states them too. Otherwise a theme with explicit shades (Mantis) would override every nested re-colouring.
+    const recoloured = Object.keys(themeVars ?? {}).filter((key) => /^color-[a-z]+$/.test(key));
+    const inheritedShade = (key: string) =>
+      recoloured.some((base) => key.startsWith(`${base}-`) && /^\d+$/.test(key.slice(base.length + 1))) &&
+      !(key in (themeVars ?? {}));
+    const withoutInheritedShades = <T,>(vars: T): T =>
+      vars && typeof vars === "object" && recoloured.length
+        ? (Object.fromEntries(
+            Object.entries(vars as Record<string, unknown>)
+              .filter(([key]) => !inheritedShade(key))
+              .map(([key, value]) =>
+                key === "light" || key === "dark" ? [key, withoutInheritedShades(value)] : [key, value],
+              ),
+          ) as T)
+        : vars;
     const foundTheme = {
       ...themeToExtend,
       id: generatedId,
+      themeVars: withoutInheritedShades(themeToExtend.themeVars),
       tones: {
         ...themeToExtend.tones,
         [themeTone]: {
           ...themeToExtend.tones?.[themeTone],
           themeVars: {
-            ...themeToExtend.tones?.[themeTone]?.themeVars,
+            ...withoutInheritedShades(themeToExtend.tones?.[themeTone]?.themeVars),
             ...themeVars,
           },
         },
