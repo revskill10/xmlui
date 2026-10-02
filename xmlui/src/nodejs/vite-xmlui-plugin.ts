@@ -511,6 +511,8 @@ export type CompiledXmluiModule = {
   kind: "markup" | "script";
   data: Record<string, any>;
   warnings: string[];
+  /** The markup's parse errors (the module then exports xmlui's error component, as a build does). */
+  errors?: string[];
   mapId: string;
   debugSources: CompiledScriptSource[];
   artifacts?: Record<string, any>;
@@ -962,6 +964,7 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
         if (parserOptions.role === "entrypoint" && inlineComponents.length > 0) {
           await resolveInlineComponentCodeBehind(inlineComponents, normalizedId, debugSourcesById);
         }
+        const parseErrors = errors.map((e: any) => (typeof e === "string" ? e : e?.message ?? e?.text ?? JSON.stringify(e)));
         if (errors.length > 0) {
           component = errReportComponent(errors, id, erroneousCompoundComponentName);
           inlineComponents = [];
@@ -1147,7 +1150,7 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
         if (!sourceMapsEnabled()) {
           stripCompiledArtifactDebugData(file, projectRoot);
         }
-        return { kind: "markup", data: file, warnings, mapId: fileId, debugSources };
+        return { kind: "markup", data: file, warnings, errors: parseErrors, mapId: fileId, debugSources };
       }
 
       const hasXmluiScriptExtension = xmluiScriptExtension.test(id);

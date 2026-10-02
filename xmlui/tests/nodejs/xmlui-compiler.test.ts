@@ -28,6 +28,7 @@ describe("createXmluiCompiler (precompile outside Vite)", () => {
   it("reports a markup error as the error component, as a build does", async () => {
     const compiled = await createXmluiCompiler({}, { root }).compile(`<Component name="Bad"><Text></Component>`, `${root}/components/Bad.xmlui`);
     expect(JSON.stringify(compiled?.data.component)).toMatch(/error/i);
+    expect(compiled?.errors?.length).toBeGreaterThan(0);
   });
 
   it("ignores files it does not handle", async () => {
