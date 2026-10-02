@@ -502,6 +502,43 @@ const generatedOptimizerMetadataLookup = (
 /**
  * Transform XMLUI files to JS objects.
  */
+
+/** Where a compile reports: Rollup's plugin context in a build, the console (or a collector) elsewhere. */
+export type XmluiCompileContext = { warn(message: string): void; error(message: string): never | void };
+
+/** One compiled file: the data its module exports (`default` and named exports alike). */
+export type CompiledXmluiModule = {
+  kind: "markup" | "script";
+  data: Record<string, any>;
+  warnings: string[];
+  mapId: string;
+  debugSources: CompiledScriptSource[];
+  artifacts?: Record<string, any>;
+};
+
+const consoleCompileContext: XmluiCompileContext = {
+  warn: (message) => console.warn(message),
+  error: (message) => {
+    throw new Error(message);
+  },
+};
+
+/**
+ * Precompiles XMLUI files outside Vite — e.g. a server that compiles an app (and its installed modules' components) at
+ * start and hands the result to the standalone runtime (`startApp(runtime)`), so the browser neither fetches nor
+ * parses markup. Same options and output as the Vite plugin; `root` is the project root file ids are relative to.
+ */
+export function createXmluiCompiler(pluginOptions: PluginOptions = {}, { root }: { root: string }) {
+  const plugin = viteXmluiPlugin(pluginOptions) as Plugin & {
+    api: { compile(code: string, id: string, ctx?: XmluiCompileContext): Promise<CompiledXmluiModule | undefined> };
+  };
+  (plugin.configResolved as (config: { root: string }) => void)({ root });
+  return {
+    /** The data of one file's module (`{ default: … }` in a runtime map), or undefined for a file it does not handle. */
+    compile: (code: string, id: string, ctx?: XmluiCompileContext) => plugin.api.compile(code, id, ctx),
+  };
+}
+
 export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plugin {
   let projectRoot = "";
   let virtualSources: XmluiVirtualSourceRegistry | undefined;
@@ -823,9 +860,16 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
     }
   }
 
-  return {
-    name: "vite:transform-xmlui",
-    transform: async function (code: string, id: string, options) {
+  /**
+   * Compiles one XMLUI file (markup `.xmlui`, code-behind `.xmlui.xs`, module `.xs`) to the data its module exports:
+   * the plugin's transform and the Node API ({@link createXmluiCompiler}) share it, so a server that precompiles an
+   * app produces exactly what a Vite build does. `ctx` receives warnings and errors (Rollup's `this` in a build).
+   */
+  async function compileXmluiModule(
+    ctx: XmluiCompileContext,
+    code: string,
+    id: string,
+  ): Promise<CompiledXmluiModule | undefined> {
       if (
         !xmluiExtension.test(id) &&
         !xmluiScriptExtension.test(id) &&
@@ -897,13 +941,13 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
               Object.entries(codeBehind.moduleErrors).forEach(
                 ([modulePath, errors]: [string, any]) => {
                   errors.forEach((err) => {
-                    this.warn(`[${modulePath}:${err.line}:${err.column}] ${err.code}: ${err.text}`);
+                    ctx.warn(`[${modulePath}:${err.line}:${err.column}] ${err.code}: ${err.text}`);
                   });
                 },
               );
             }
           } catch (e) {
-            this.error(`Error collecting imports: ${e}`);
+            ctx.error(`Error collecting imports: ${e}`);
           }
         }
 
@@ -923,9 +967,9 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
           inlineComponents = [];
         }
         if (warnings.length > 0) {
-          warnings.forEach((msg) => this.warn(`[xmlui] ${msg}`));
+          warnings.forEach((msg) => ctx.warn(`[xmlui] ${msg}`));
         }
-        drainCodeBehindWarnings((message) => this.warn(message));
+        drainCodeBehindWarnings((message) => ctx.warn(message));
 
         // --- Run static analyzer when not disabled
         if (analyzeMode !== "off") {
@@ -944,9 +988,9 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
             const analyzerDiags = analyze({ files: analyzerFiles, strict });
             for (const diag of analyzerDiags) {
               if (diag.severity === "error" && strict) {
-                this.error(`[xmlui-check] ${diag.code}: ${diag.message}`);
+                ctx.error(`[xmlui-check] ${diag.code}: ${diag.message}`);
               } else {
-                this.warn(`[xmlui-check] ${diag.code}: ${diag.message}`);
+                ctx.warn(`[xmlui-check] ${diag.code}: ${diag.message}`);
               }
             }
           } catch (_analyzerErr) {
@@ -990,9 +1034,9 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
               // `severity:"info"` (pure-conditional) cycles never fail
               // the build — they are advisory only.
               if (strictCycles && (hit.severity ?? "warn") === "warn") {
-                this.error(message);
+                ctx.error(message);
               } else {
-                this.warn(message);
+                ctx.warn(message);
               }
             }
           }
@@ -1002,7 +1046,7 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
         // Run lintComponentDef on the parsed component tree to surface
         // accessibility violations (icon-only-button, modal-no-title, and
         // others when a11yRegistry is supplied). In non-strict mode violations
-        // are warnings; in strict mode must-have codes call this.error().
+        // are warnings; in strict mode must-have codes call ctx.error().
         if (a11yMode !== "off" && component) {
           try {
             const roots = [
@@ -1022,10 +1066,10 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
                 const message = `[xmlui:a11y] ${file}: [${hit.code}] ${hit.message}${hit.fix ? ` Suggestion: ${hit.fix}` : ""}`;
                 if (strictA11y && hit.severity === "error") {
                   a11yErrorCount++;
-                  this.error(message);
+                  ctx.error(message);
                 } else {
                   a11yWarnCount++;
-                  this.warn(message);
+                  ctx.warn(message);
                 }
               }
             }
@@ -1062,10 +1106,10 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
             typeContractCounts.set(hit.code, (typeContractCounts.get(hit.code) ?? 0) + 1);
             if (strictTypes && hit.severity === "error") {
               typeContractErrorCount++;
-              this.error(message);
+              ctx.error(message);
             } else {
               typeContractWarnCount++;
-              this.warn(message);
+              ctx.warn(message);
             }
           }
         }
@@ -1103,20 +1147,7 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
         if (!sourceMapsEnabled()) {
           stripCompiledArtifactDebugData(file, projectRoot);
         }
-        const outputCode = browserWarningLogCode(warnings) + dataToEsm(file);
-        const map = sourceMapsEnabled()
-          ? createTransformSourceMap(outputCode, fileId, debugSources)
-          : { mappings: "" };
-        if (sourceMapsEnabled()) {
-          virtualSources?.register(debugSources[0], map);
-          registerCompiledArtifacts(file);
-        }
-
-        return {
-          code: outputCode,
-          map,
-          moduleType: "js",
-        };
+        return { kind: "markup", data: file, warnings, mapId: fileId, debugSources };
       }
 
       const hasXmluiScriptExtension = xmluiScriptExtension.test(id);
@@ -1169,13 +1200,13 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
         );
         collectCodeBehindWarnings(codeBehind);
         removeCodeBehindTokensFromTree(codeBehind);
-        drainCodeBehindWarnings((message) => this.warn(message));
+        drainCodeBehindWarnings((message) => ctx.warn(message));
 
         // --- Display any module errors as warnings
         if (codeBehind.moduleErrors && Object.keys(codeBehind.moduleErrors).length > 0) {
           Object.entries(codeBehind.moduleErrors).forEach(([modulePath, errors]) => {
             errors.forEach((err) => {
-              this.warn(`[${modulePath}:${err.line}:${err.column}] ${err.code}: ${err.text}`);
+              ctx.warn(`[${modulePath}:${err.line}:${err.column}] ${err.code}: ${err.text}`);
             });
           });
         }
@@ -1209,28 +1240,46 @@ export default function viteXmluiPlugin(pluginOptions: PluginOptions = {}): Plug
         if (!sourceMapsEnabled()) {
           stripCompiledArtifactDebugData(codeBehind, projectRoot);
         }
-        const outputCode = dataToEsm({
-          ...codeBehind,
-          src: code,
-          sourceUrl: debugSources[0]?.url ?? createDebugSourceUrl(normalizedId),
-          ...(sourceMapsEnabled() ? { debugSources } : {}),
-        });
-
-        const map = sourceMapsEnabled()
-          ? createTransformSourceMap(outputCode, normalizedId, debugSources)
-          : { mappings: "" };
-        if (sourceMapsEnabled()) {
-          virtualSources?.register(debugSources[0], map);
-          registerCompiledArtifacts(codeBehind);
-        }
-
         return {
-          code: outputCode,
-          map,
-          moduleType: "js",
+          kind: "script",
+          data: {
+            ...codeBehind,
+            src: code,
+            sourceUrl: debugSources[0]?.url ?? createDebugSourceUrl(normalizedId),
+            ...(sourceMapsEnabled() ? { debugSources } : {}),
+          },
+          artifacts: codeBehind,
+          warnings: [],
+          mapId: normalizedId,
+          debugSources,
         };
       }
-      return null;
+      return undefined;
+  }
+
+  function emitModule(compiled: CompiledXmluiModule) {
+    const outputCode =
+      (compiled.kind === "markup" ? browserWarningLogCode(compiled.warnings) : "") + dataToEsm(compiled.data);
+    const map = sourceMapsEnabled()
+      ? createTransformSourceMap(outputCode, compiled.mapId, compiled.debugSources)
+      : { mappings: "" };
+    if (sourceMapsEnabled()) {
+      virtualSources?.register(compiled.debugSources[0], map);
+      registerCompiledArtifacts(compiled.kind === "markup" ? compiled.data : compiled.artifacts);
+    }
+    return { code: outputCode, map, moduleType: "js" };
+  }
+
+  return {
+    name: "vite:transform-xmlui",
+    api: {
+      /** The compiled data of one file, as its module exports it (see {@link createXmluiCompiler}). */
+      compile: (code: string, id: string, ctx: XmluiCompileContext = consoleCompileContext) =>
+        compileXmluiModule(ctx, code, id),
+    },
+    transform: async function (code: string, id: string, options) {
+      const compiled = await compileXmluiModule(this, code, id);
+      return compiled ? emitModule(compiled) : null;
     },
 
     configResolved(config) {

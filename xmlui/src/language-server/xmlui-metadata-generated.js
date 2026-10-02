@@ -2451,6 +2451,49 @@ export default {
         "defaultValue": "appTone",
         "isInternal": true
       },
+      "navPanelCollapseMode": {
+        "description": "How a collapsed `NavPanel` looks in vertical layouts: `hidden` shows only its footer strip; `icons` keeps each `NavLink` as its icon (the label becomes a tooltip). Custom content can read `<navPanelId>.collapsed`.",
+        "valueType": "string",
+        "availableValues": [
+          "hidden",
+          "icons"
+        ],
+        "defaultValue": "hidden"
+      },
+      "navPanelCollapsed": {
+        "description": "Collapses (`true`) or expands (`false`) the `NavPanel` whenever this value changes (vertical layouts), e.g. bound to a layout preference. The first value does not override the state restored by `persistNavPanel`; the person can still collapse or expand the panel by hand.",
+        "valueType": "boolean"
+      },
+      "persistNavPanel": {
+        "description": "When `true`, the NavPanel's collapsed state and dragged width are saved to `localStorage` (under `navPanelStorageKey`) and restored on the next visit.",
+        "valueType": "boolean",
+        "defaultValue": false
+      },
+      "navPanelStorageKey": {
+        "description": "The `localStorage` key used when `persistNavPanel` is `true`.",
+        "valueType": "string",
+        "defaultValue": "appNavPanel"
+      },
+      "navPanelPeek": {
+        "description": "When `true`, hovering or focusing a collapsed NavPanel opens it over the page content (the content does not move); leaving it collapses it again.",
+        "valueType": "boolean",
+        "defaultValue": false
+      },
+      "navPanelResizable": {
+        "description": "When `true`, the expanded NavPanel has a drag handle on its edge (also keyboard-operable with the arrow keys; double-click resets to the theme width).",
+        "valueType": "boolean",
+        "defaultValue": false
+      },
+      "navPanelMinWidth": {
+        "description": "The smallest width (px) the NavPanel can be dragged to.",
+        "valueType": "number",
+        "defaultValue": 200
+      },
+      "navPanelMaxWidth": {
+        "description": "The largest width (px) the NavPanel can be dragged to.",
+        "valueType": "number",
+        "defaultValue": 480
+      },
       "locale": {
         "description": "BCP-47 locale override for the app. Use this to set the active locale from markup; user-driven locale changes through `App.setLocale()` can still update the active locale at runtime.",
         "valueType": "string"
@@ -13780,6 +13823,10 @@ export default {
         "description": "This property defines whether the group is initially expanded or collapsed. If not defined, the group is collapsed by default.",
         "valueType": "boolean"
       },
+      "storageKey": {
+        "description": "When set, the group remembers whether it is expanded in the browser's local storage under this key, so a reload or another page shows it as the user left it. A group holding the active link still expands. Applies to groups in a vertical navigation panel.",
+        "valueType": "string"
+      },
       "enabled": {
         "description": "This boolean property value indicates whether the component responds to user events (`true`) or not (`false`).",
         "valueType": "boolean",
@@ -14183,6 +14230,20 @@ export default {
   "NavPanel": {
     "status": "stable",
     "description": "`NavPanel` defines the navigation structure within an App, serving as a container for NavLink and NavGroup components that create your application's primary navigation menu. Its appearance and behavior automatically adapt based on the App's layout configuration.",
+    "apis": {
+      "collapsed": {
+        "description": "`true` while the panel is collapsed in a vertical layout (and not peeking). Custom content can use it, e.g. `when=\"{!nav.collapsed}\"` on a heading that has no icon form.",
+        "signature": "collapsed: boolean"
+      },
+      "toggleCollapsed": {
+        "description": "Collapses an expanded panel or expands a collapsed one (vertical layouts).",
+        "signature": "toggleCollapsed(): void"
+      },
+      "setCollapsed": {
+        "description": "Collapses (`true`) or expands (`false`) the panel (vertical layouts).",
+        "signature": "setCollapsed(collapsed: boolean): void"
+      }
+    },
     "parts": {
       "logo": {
         "description": "The logo area within the NavPanel component."
@@ -17574,6 +17635,11 @@ export default {
         "isStrictEnum": true,
         "valueType": "string",
         "defaultValue": "top"
+      },
+      "floating": {
+        "description": "When true, the box floats over the page instead of being a bar: it paints no background and only its content catches the pointer, so the page beneath its empty area stays visible and clickable (e.g. a floating action button).",
+        "valueType": "boolean",
+        "defaultValue": false
       }
     },
     "themeVars": [],

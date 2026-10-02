@@ -33,7 +33,10 @@ document.addEventListener("DOMContentLoaded", function () {
   if (islandTargets.length > 0) {
     activateIslands(islandTargets);
   } else {
-    startApp(undefined, undefined, Xmlui);
+    // A precompiled app: a server that compiled the markup ahead (createXmluiCompiler, the same compiler as a Vite
+    // build) sets window.xmluiRuntime — the runtime map startApp takes — before this bundle starts. Without it the
+    // markup is fetched and parsed in the browser.
+    startApp((window as any).xmluiRuntime, undefined, Xmlui);
   }
 });
 
