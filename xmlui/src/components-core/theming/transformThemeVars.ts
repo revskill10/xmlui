@@ -774,7 +774,8 @@ function generateBaseTonesForColor(
       color950 = baseColor.lightness(13);
       color1000 = baseColor.lightness(9);
     } else {
-      const baseL = baseColor.hsl().l();
+      // HSL lightness: in color@4 `.hsl().l()` is CIELAB L, which put the scale off the base colour.
+      const baseL = baseColor.lightness();
       const darkStep = baseL / 5;
       const lightStep = (100 - baseL) / 5;
       color0 = baseColor.lightness(100);
