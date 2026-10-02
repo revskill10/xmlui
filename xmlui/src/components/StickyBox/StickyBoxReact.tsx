@@ -18,9 +18,10 @@ const HIDDEN_STYLE = { display: "none" } as const;
 type Props = React.HTMLAttributes<HTMLElement> & {
   classes?: Record<string, string>;
   to: "top" | "bottom";
+  floating?: boolean;
 };
 
-export const StickyBox = memo(function StickyBox({ children, style, to = defaultProps.to, className, classes, ...rest }: Props) {
+export const StickyBox = memo(function StickyBox({ children, style, to = defaultProps.to, floating = defaultProps.floating, className, classes, ...rest }: Props) {
   const sentinelRef = useRef(null);
   const [wrapper, setWrapper] = useState(null);
   const [stuck, setStuck] = useState(false);
@@ -34,10 +35,10 @@ export const StickyBox = memo(function StickyBox({ children, style, to = default
       );
     }
   }, [scrollParent, wrapper]);
-  const wrapperClassName = classnames(styles.wrapper, classes?.[COMPONENT_PART_KEY], className);
+  const wrapperClassName = classnames(styles.wrapper, floating && styles.floating, classes?.[COMPONENT_PART_KEY], className);
   const stickyStyles = useMemo(
-    () => ({ backgroundColor: realBackground, ...style }),
-    [realBackground, style],
+    () => (floating ? { ...style } : { backgroundColor: realBackground, ...style }),
+    [floating, realBackground, style],
   );
   const stickyClassName = "";
   return (

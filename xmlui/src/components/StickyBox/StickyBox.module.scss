@@ -12,6 +12,17 @@ $themeVars: ();
     z-index: 1;
   }
 
+  // Floating: no bar. The box and its inner holder let the pointer through; only the content catches it.
+  .floating {
+    pointer-events: none;
+    & > * {
+      pointer-events: none;
+    }
+    & > * > * {
+      pointer-events: auto;
+    }
+  }
+
   .sentinel ~ *:has([data-anchor="true"]) {
     [data-anchor="true"] {
       //my-scroll-margin-top is set by the heading component, we have to take that into account, too

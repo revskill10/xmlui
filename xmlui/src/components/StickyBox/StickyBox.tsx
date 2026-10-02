@@ -22,6 +22,14 @@ export const StickyBoxMd = createMetadata({
       valueType: "string",
       defaultValue: defaultProps.to,
     },
+    floating: {
+      description:
+        "When true, the box floats over the page instead of being a bar: it paints no background and only its " +
+        "content catches the pointer, so the page beneath its empty area stays visible and clickable (e.g. a " +
+        "floating action button).",
+      valueType: "boolean",
+      defaultValue: defaultProps.floating,
+    },
   },
   themeVars: parseScssVar(styles.themeVars),
   defaultThemeVars: {
