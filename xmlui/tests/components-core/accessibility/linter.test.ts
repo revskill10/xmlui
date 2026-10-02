@@ -111,6 +111,12 @@ describe("rule: icon-only-button-no-label", () => {
     expect(result.find((d) => d.code === "icon-only-button-no-label")?.severity).toBe("error");
   });
 
+  it("emits no diagnostic when a tooltip names it (Button takes the tooltip text as its accessible name)", () => {
+    const def: ComponentDef = { type: "Button", props: { icon: "trash", tooltip: "Delete" } };
+    const result = lintComponentDef(def, makeRegistry());
+    expect(result.filter((d) => d.code === "icon-only-button-no-label")).toHaveLength(0);
+  });
+
   it("emits no diagnostic when label is provided", () => {
     const def: ComponentDef = { type: "Button", props: { icon: "trash", label: "Delete" } };
     const result = lintComponentDef(def, makeRegistry());

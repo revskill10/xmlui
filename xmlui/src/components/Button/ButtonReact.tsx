@@ -75,6 +75,10 @@ export const Button = memo(forwardRef(function Button(
     variant = defaultProps.variant;
   }
   const iconToLeft = iconPosition === "start";
+  // An icon-only button is nameless on its own: like Icon, it takes the tooltip's text (re-delivered by the Tooltip
+  // trigger as data-tooltip-text) as its accessible name unless one is given.
+  const tooltipName = icon && !children ? (rest as Record<string, unknown>)["data-tooltip-text"] : undefined;
+  const accessibleName = (rest as Record<string, unknown>)["aria-label"] ?? tooltipName;
 
   if (!isSizeType(size)) {
     size = defaultProps.size;
@@ -82,6 +86,7 @@ export const Button = memo(forwardRef(function Button(
   return (
     <button
       {...rest}
+      aria-label={accessibleName as string | undefined}
       id={id}
       type={type}
       ref={composedRef}

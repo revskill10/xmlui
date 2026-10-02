@@ -200,9 +200,11 @@ function checkIconOnlyButton(
     (props.label != null && props.label !== "") ||
     (props["aria-label"] != null && props["aria-label"] !== "") ||
     (props.title != null && props.title !== "") ||
+    // A tooltip names an icon-only button (Button takes the tooltip text as its accessible name).
+    (props.tooltip != null && props.tooltip !== "") ||
     // Accept an expression-valued prop optimistically
     Object.keys(props).some(
-      (k) => ["label", "aria-label", "title"].includes(k) &&
+      (k) => ["label", "aria-label", "title", "tooltip"].includes(k) &&
         String(props[k]).startsWith("{"),
     );
 
