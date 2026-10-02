@@ -142,6 +142,13 @@ export const AppMd = createMetadata({
       availableValues: ["hidden", "icons"],
       defaultValue: defaultProps.navPanelCollapseMode,
     },
+    navPanelCollapsed: {
+      description:
+        "Collapses (`true`) or expands (`false`) the `NavPanel` whenever this value changes (vertical layouts), e.g. " +
+        "bound to a layout preference. The first value does not override the state restored by `persistNavPanel`; " +
+        "the person can still collapse or expand the panel by hand.",
+      valueType: "boolean",
+    },
     persistNavPanel: {
       description:
         "When `true`, the NavPanel's collapsed state and dragged width are saved to `localStorage` " +
@@ -454,6 +461,7 @@ function AppNode({
       toneStorageKey={extractValue(node.props.toneStorageKey) ?? defaultProps.toneStorageKey}
       navPanelCollapseMode={extractValue.asOptionalString(node.props.navPanelCollapseMode, defaultProps.navPanelCollapseMode) as "hidden" | "icons"}
       persistNavPanel={extractValue.asOptionalBoolean(node.props.persistNavPanel, defaultProps.persistNavPanel)}
+      navPanelCollapsed={extractValue.asOptionalBoolean(node.props.navPanelCollapsed)}
       navPanelStorageKey={extractValue(node.props.navPanelStorageKey) ?? defaultProps.navPanelStorageKey}
       navPanelPeek={extractValue.asOptionalBoolean(node.props.navPanelPeek, defaultProps.navPanelPeek)}
       navPanelResizable={extractValue.asOptionalBoolean(node.props.navPanelResizable, defaultProps.navPanelResizable)}

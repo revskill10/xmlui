@@ -115,6 +115,7 @@ type Props = {
   themeStorageKey?: string;
   navPanelCollapseMode?: "hidden" | "icons";
   persistNavPanel?: boolean;
+  navPanelCollapsed?: boolean;
   navPanelStorageKey?: string;
   navPanelPeek?: boolean;
   navPanelResizable?: boolean;
@@ -173,6 +174,7 @@ export const App = memo(function App({
   themeStorageKey = defaultProps.themeStorageKey,
   navPanelCollapseMode = defaultProps.navPanelCollapseMode,
   persistNavPanel = defaultProps.persistNavPanel,
+  navPanelCollapsed: navPanelCollapsedProp,
   navPanelStorageKey = defaultProps.navPanelStorageKey,
   navPanelPeek = defaultProps.navPanelPeek,
   navPanelResizable = defaultProps.navPanelResizable,
@@ -393,6 +395,14 @@ export const App = memo(function App({
     setNavPanelCollapsedState((prev) => !prev);
     setNavPanelPeeking(false);
   }, []);
+  // `navPanelCollapsed` applies when it CHANGES (e.g. a layout preference switched in place); its first value leaves
+  // the restored state alone, so a panel collapsed by hand stays collapsed after a reload.
+  const lastNavPanelCollapsedProp = useRef(navPanelCollapsedProp);
+  useEffect(() => {
+    if (navPanelCollapsedProp === undefined || navPanelCollapsedProp === lastNavPanelCollapsedProp.current) return;
+    lastNavPanelCollapsedProp.current = navPanelCollapsedProp;
+    setNavPanelCollapsed(navPanelCollapsedProp);
+  }, [navPanelCollapsedProp, setNavPanelCollapsed]);
   useEffect(() => {
     if (!persistNavPanel || typeof window === "undefined") return;
     try {
