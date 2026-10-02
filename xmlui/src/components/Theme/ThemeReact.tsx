@@ -99,16 +99,20 @@ export function Theme({
       ...themeToExtend,
       id: generatedId,
       themeVars: withoutInheritedShades(themeToExtend.themeVars),
-      tones: {
-        ...themeToExtend.tones,
-        [themeTone]: {
-          ...themeToExtend.tones?.[themeTone],
-          themeVars: {
-            ...withoutInheritedShades(themeToExtend.tones?.[themeTone]?.themeVars),
-            ...themeVars,
+      // This Theme's variables hold in every tone, not only the current one: a descendant that switches tone
+      // (e.g. a HeroSection's dark content) re-derives from this definition and must keep them.
+      tones: Object.fromEntries(
+        [...new Set([...Object.keys(themeToExtend.tones ?? {}), "light", "dark", themeTone])].map((toneName) => [
+          toneName,
+          {
+            ...themeToExtend.tones?.[toneName],
+            themeVars: {
+              ...withoutInheritedShades(themeToExtend.tones?.[toneName]?.themeVars),
+              ...themeVars,
+            },
           },
-        },
-      },
+        ]),
+      ),
     };
     return foundTheme;
   }, [activeTheme, generatedId, id, themeTone, themeVars, themes]);
