@@ -576,7 +576,7 @@ const ComponentAdapter = forwardRef(function ComponentAdapter(
   // --- memoize them using shallow comparison to avoid unnecessary re-renders.
   const stableLayoutCss = useShallowCompareMemoize(cssProps);
 
-  const themeClassName = useComponentThemeClass(descriptor);
+  const themeClassName = useComponentThemeClass(descriptor, { componentScopedOnly: !!isCompoundComponent });
 
   // --- Collect extended layout props: keys with part and/or breakpoint suffixes
   // --- (e.g. "fontSize-label", "padding-md", "color-input-lg")

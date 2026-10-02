@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useStyles } from "./StyleContext";
 import { THEME_VAR_PREFIX } from "./component-layout-resolver";
 import { useComponentRegistry } from "../../components/ComponentRegistryContext";
+import { parseHVar } from "./hvar";
 
 /**
  * Each theme can have a light or a dark tone.
@@ -36,7 +37,14 @@ export const SizeScaleReadableKeys = {
   "3xl": "Triple Extra Large",
 } as const;
 
-export function useComponentThemeClass(descriptor: ComponentMetadata) {
+/**
+ * Pins the theme variables a component uses, resolved in the theme scope it renders in, on its element.
+ * `componentScopedOnly` (user-defined components): pin only component-scoped variables (e.g. `width-MyCard`). A
+ * user-defined component's root is often a `<Theme>` of its own, and the pinned class reaches that Theme's first
+ * child: pinning base variables (`color-primary-500`) there would override the component's own Theme with the outer
+ * values. Base variables inherit through CSS anyway, so nothing else changes.
+ */
+export function useComponentThemeClass(descriptor: ComponentMetadata, { componentScopedOnly = false } = {}) {
   let themeScope = useTheme();
   const componentRegistry = useComponentRegistry();
 
@@ -64,6 +72,9 @@ export function useComponentThemeClass(descriptor: ComponentMetadata) {
 
     Object.entries(collectedThemeVars).forEach(([key]) => {
       let keyWithoutClass = key.replace("Input:", "").replace("Heading:", "");
+      if (componentScopedOnly && !parseHVar(keyWithoutClass)?.component) {
+        return;
+      }
       // Use themeScope.themeVars (allThemeVarsWithResolvedHierarchicalVars) instead of getThemeVar,
       // because getThemeVar only follows pure $-reference chains and does NOT resolve embedded
       // $-references in compound values like "1px solid $borderColor".
@@ -80,6 +91,7 @@ export function useComponentThemeClass(descriptor: ComponentMetadata) {
     descriptor?.themeVars,
     descriptor?.defaultThemeVars,
     descriptor?.themeVarContributorComponents,
+    componentScopedOnly,
     themeScope,
     themeScope.themeVars,
     componentRegistry,
