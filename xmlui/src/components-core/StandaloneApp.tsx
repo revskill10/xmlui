@@ -915,6 +915,14 @@ function matchesFolder(path: string, folderName: string) {
 }
 
 /**
+ * A runtime that carries a compiled entry point (a precompiled app — a server compiled the markup ahead, see
+ * `createXmluiCompiler`) is the app itself, in every build mode: the standalone bundle then fetches no markup.
+ */
+function hasPrecompiledEntry(resolved: { standaloneApp?: StandaloneAppDescription }): boolean {
+  return !!resolved.standaloneApp?.entryPoint;
+}
+
+/**
  * This function turns a collection of runtime file declarations into a standalone
  * app description.
  * @param runtime A hash object containing the runtime files. The keys are the file
@@ -1309,10 +1317,11 @@ function useStandalone(
     // --- In dev mode or when the app is inlined (provided we do not use the standalone mode),
     // --- we must have the app definition available.
     if (
-      (import.meta.env.VITE_XMLUI_DEV_MODE ||
+      hasPrecompiledEntry(resolvedRuntime) ||
+      ((import.meta.env.VITE_XMLUI_DEV_MODE ||
         import.meta.env.VITE_XMLUI_BUILD_MODE === "INLINE_ALL" ||
         import.meta.env.VITE_XMLUI_BUILD_MODE == null) &&
-      import.meta.env.MODE !== "standalone"
+        import.meta.env.MODE !== "standalone")
     ) {
       if (!appDef) {
         throw new Error("couldn't find the application metadata");
@@ -1479,10 +1488,11 @@ function useStandalone(
       // --- In dev mode or when the app is inlined (provided we do not use the standalone mode),
       // --- we must have the app definition available.
       if (
-        (import.meta.env.VITE_XMLUI_DEV_MODE ||
+        hasPrecompiledEntry(resolvedRuntime) ||
+        ((import.meta.env.VITE_XMLUI_DEV_MODE ||
           import.meta.env.VITE_XMLUI_BUILD_MODE === "INLINE_ALL" ||
           import.meta.env.VITE_XMLUI_BUILD_MODE == null) &&
-        import.meta.env.MODE !== "standalone"
+          import.meta.env.MODE !== "standalone")
       ) {
         if (!appDef) {
           throw new Error("couldn't find the application metadata");
