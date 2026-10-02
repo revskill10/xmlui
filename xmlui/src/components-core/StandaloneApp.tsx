@@ -919,7 +919,8 @@ function matchesFolder(path: string, folderName: string) {
  * `createXmluiCompiler`) is the app itself, in every build mode: the standalone bundle then fetches no markup.
  */
 function hasPrecompiledEntry(resolved: { standaloneApp?: StandaloneAppDescription }): boolean {
-  return !!resolved.standaloneApp?.entryPoint;
+  // resolveRuntime always assembles an entryPoint object (code-behind fields); only a compiled one has a type.
+  return !!(resolved.standaloneApp?.entryPoint as { type?: string } | undefined)?.type;
 }
 
 /**
