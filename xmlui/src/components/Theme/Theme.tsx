@@ -68,7 +68,14 @@ export const themeComponentRenderer = wrapComponent(COMP, Theme, ThemeMd, {
     const disableInlineStyle = extractValue.asOptionalBoolean(disableInlineStyleProp);
     const shouldSuppressRootThemeCssVars =
       extractValue.asOptionalBoolean(suppressRootThemeCssVars) === true;
-    const themeVars = extractValue(themeVarProps);
+    // A theme variable bound to no value (undefined, null, "") is not an override: the theme's own value holds — so a
+    // Theme can bind a variable to an optional choice (e.g. color-primary="{chosenColour}") without replacing anything
+    // when there is none.
+    const themeVars = Object.fromEntries(
+      Object.entries(extractValue(themeVarProps) ?? {}).filter(
+        ([, value]) => value !== undefined && value !== null && value !== "",
+      ),
+    );
 
     // Determine if Theme actually does anything meaningful
     // If no theme properties are set and applyIf is not explicitly set, default to false
