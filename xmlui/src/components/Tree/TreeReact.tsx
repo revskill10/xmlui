@@ -58,6 +58,59 @@ interface RowContext {
   animateExpand: boolean;
   expandRotation: number;
   spinnerDelay: number;
+  /** hipc explorer features (VS Code-like): drag & drop, inline rename, multi-select. */
+  explorer: ExplorerContext;
+}
+
+export type DropPosition = "before" | "after" | "inside";
+
+interface ExplorerContext {
+  draggable: boolean;
+  editable: boolean;
+  multiSelect: boolean;
+  dropTarget: { key: string; position: DropPosition } | null;
+  editingKey: string | null;
+  onRowDragStart: (node: FlatTreeNode, e: React.DragEvent) => void;
+  onRowDragOver: (node: FlatTreeNode, e: React.DragEvent) => void;
+  onRowDrop: (node: FlatTreeNode, e: React.DragEvent) => void;
+  onRowDragEnd: () => void;
+  onRowPointerSelect: (node: FlatTreeNode, e: React.MouseEvent) => boolean;
+  startEdit: (node: FlatTreeNode) => void;
+  commitEdit: (node: FlatTreeNode, value: string) => void;
+  cancelEdit: () => void;
+}
+
+/** The inline rename box: selects the name, Enter commits, Escape cancels, leaving it commits (VS Code). */
+function RenameInput({ initial, onCommit, onCancel }: { initial: string; onCommit: (v: string) => void; onCancel: () => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+  const finish = (commit: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (commit) onCommit(ref.current?.value ?? initial);
+    else onCancel();
+  };
+  return (
+    <input
+      ref={ref}
+      className={styles.renameInput}
+      defaultValue={initial}
+      aria-label="Rename"
+      data-tree-rename
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") { e.preventDefault(); finish(true); }
+        if (e.key === "Escape") { e.preventDefault(); finish(false); }
+      }}
+      onBlur={() => finish(true)}
+    />
+  );
 }
 
 interface TreeRowProps {
@@ -91,8 +144,12 @@ const TreeRow = memo(({ index, data, isSelected, isFocused }: TreeRowProps) => {
     animateExpand,
     expandRotation,
     spinnerDelay,
+    explorer,
   } = data;
   const treeItem = nodes[index];
+  const rowKey = String(treeItem.key);
+  const drop = explorer.dropTarget && explorer.dropTarget.key === rowKey ? explorer.dropTarget.position : null;
+  const isEditing = explorer.editingKey === rowKey;
 
   // Track whether the spinner delay has expired for this loading node
   const nodeWithState = treeItem as FlatTreeNodeWithState;
@@ -141,6 +198,13 @@ const TreeRow = memo(({ index, data, isSelected, isFocused }: TreeRowProps) => {
 
   const onItemMouseDownHandler = useCallback(
     (e: React.MouseEvent) => {
+      // hipc: Ctrl/Cmd and Shift extend a multi-selection instead of replacing it.
+      if (e.button === 0 && explorer.onRowPointerSelect(treeItem, e)) {
+        setTimeout(() => {
+          treeContainerRef.current?.focus({ preventScroll: true });
+        }, 0);
+        return;
+      }
       // Handle selection immediately on mouse down for immediate visual feedback
       if (treeItem.selectable) {
         onSelection(treeItem);
@@ -150,7 +214,7 @@ const TreeRow = memo(({ index, data, isSelected, isFocused }: TreeRowProps) => {
         }, 0);
       }
     },
-    [onSelection, treeItem, treeContainerRef],
+    [onSelection, treeItem, treeContainerRef, explorer],
   );
 
   const onItemClickHandler = useCallback(
@@ -176,8 +240,8 @@ const TreeRow = memo(({ index, data, isSelected, isFocused }: TreeRowProps) => {
       // Prevent default browser context menu
       e.preventDefault();
 
-      // Focus the item when context menu is triggered
-      if (treeItem.selectable) {
+      // Focus the item when context menu is triggered (a multi-selection that includes it is kept, as in VS Code)
+      if (treeItem.selectable && !isSelected) {
         onSelection(treeItem);
         // Ensure tree container maintains focus after mouse selection
         setTimeout(() => {
@@ -204,7 +268,7 @@ const TreeRow = memo(({ index, data, isSelected, isFocused }: TreeRowProps) => {
         handler?.(e);
       }
     },
-    [lookupEventHandler, treeItem, onSelection, treeContainerRef],
+    [lookupEventHandler, treeItem, onSelection, treeContainerRef, isSelected],
   );
 
   return (
@@ -213,7 +277,17 @@ const TreeRow = memo(({ index, data, isSelected, isFocused }: TreeRowProps) => {
         className={classnames(styles.rowWrapper, {
           [styles.selected]: isSelected,
           [styles.focused]: isFocused,
+          [styles.dropBefore]: drop === "before",
+          [styles.dropAfter]: drop === "after",
+          [styles.dropInside]: drop === "inside",
         })}
+        data-tree-key={rowKey}
+        draggable={explorer.draggable && !isEditing}
+        onDragStart={explorer.draggable ? (e) => explorer.onRowDragStart(treeItem, e) : undefined}
+        onDragOver={explorer.draggable ? (e) => explorer.onRowDragOver(treeItem, e) : undefined}
+        onDrop={explorer.draggable ? (e) => explorer.onRowDrop(treeItem, e) : undefined}
+        onDragEnd={explorer.draggable ? explorer.onRowDragEnd : undefined}
+        onDoubleClick={explorer.editable ? (e) => { e.stopPropagation(); explorer.startEdit(treeItem); } : undefined}
         role="treeitem"
         aria-level={treeItem.depth + 1}
         aria-expanded={treeItem.hasChildren ? treeItem.isExpanded : undefined}
@@ -274,7 +348,15 @@ const TreeRow = memo(({ index, data, isSelected, isFocused }: TreeRowProps) => {
           onClick={onItemClickHandler}
           style={{ cursor: "pointer" }}
         >
-          {itemRenderer(treeItem)}
+          {isEditing ? (
+            <RenameInput
+              initial={String(treeItem.displayName ?? "")}
+              onCommit={(v) => explorer.commitEdit(treeItem, v)}
+              onCancel={explorer.cancelEdit}
+            />
+          ) : (
+            itemRenderer(treeItem)
+          )}
         </div>
       </div>
     </div>
@@ -651,6 +733,15 @@ interface TreeComponentProps {
   onCopyAction?: (node: FlatTreeNode) => void | Promise<void>;
   onPasteAction?: (node: FlatTreeNode) => void | Promise<void>;
   onDeleteAction?: (node: FlatTreeNode) => void | Promise<void>;
+  /** hipc explorer: rows can be dragged onto, before or after other rows; the handler persists the move. */
+  draggable?: boolean;
+  /** hipc explorer: F2 or double-click renames a row in place; the handler persists the name. */
+  editable?: boolean;
+  /** hipc explorer: Ctrl/Cmd+click toggles, Shift+click extends, Ctrl/Cmd+A selects all. */
+  multiSelect?: boolean;
+  onMove?: (move: { ids: string[]; targetId: string; position: DropPosition; parentId: string | null }) => void | Promise<void>;
+  onRename?: (rename: { id: string; name: string; previousName: string }) => void | Promise<void>;
+  onSelectedIdsChanged?: (ids: string[]) => void;
   lookupEventHandler?: any;
   renderVersion?: number;
   itemRenderer: (item: any) => ReactNode;
@@ -716,6 +807,12 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
     onCopyAction,
     onPasteAction,
     onDeleteAction,
+    draggable = false,
+    editable = false,
+    multiSelect = false,
+    onMove,
+    onRename,
+    onSelectedIdsChanged,
     lookupEventHandler,
     renderVersion,
     itemRenderer,
@@ -2278,9 +2375,143 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
   );
 
   // Simplified keyboard navigation handler
+  // ---- hipc explorer features (VS Code explorer): multi-select, drag & drop, inline rename, type-ahead, context key
+  const [multiSelected, setMultiSelected] = useState<Set<string>>(() => new Set());
+  const selectionAnchorRef = useRef<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ key: string; position: DropPosition } | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const dragKeysRef = useRef<string[]>([]);
+  const typeAheadRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
+
+  const publishSelectedIds = useCallback(
+    (next: Set<string>) => {
+      setMultiSelected(next);
+      onSelectedIdsChanged?.(Array.from(next));
+    },
+    [onSelectedIdsChanged],
+  );
+
+  const onRowPointerSelect = useCallback(
+    (node: FlatTreeNode, e: React.MouseEvent): boolean => {
+      if (!multiSelect || !node.selectable) return false;
+      const key = String(node.key);
+      if (e.ctrlKey || e.metaKey) {
+        const next = new Set(multiSelected.size ? multiSelected : effectiveSelectedId != null ? [String(effectiveSelectedId)] : []);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        selectionAnchorRef.current = key;
+        publishSelectedIds(next);
+        setFocusedNodeByIndex(findNodeIndexById(key));
+        return true;
+      }
+      if (e.shiftKey) {
+        const anchor = selectionAnchorRef.current ?? (effectiveSelectedId != null ? String(effectiveSelectedId) : key);
+        const from = findNodeIndexById(anchor);
+        const to = findNodeIndexById(key);
+        const [lo, hi] = from < to ? [from, to] : [to, from];
+        publishSelectedIds(new Set(flatTreeData.slice(Math.max(lo, 0), hi + 1).filter((n) => n.selectable).map((n) => String(n.key))));
+        setFocusedNodeByIndex(to);
+        return true;
+      }
+      selectionAnchorRef.current = key;
+      publishSelectedIds(new Set([key]));
+      return false; // the regular single selection continues
+    },
+    [multiSelect, multiSelected, effectiveSelectedId, publishSelectedIds, findNodeIndexById, flatTreeData, setFocusedNodeByIndex],
+  );
+
+  const isDescendantOrSelf = useCallback(
+    (candidate: FlatTreeNode, ancestorKeys: string[]) =>
+      ancestorKeys.includes(String(candidate.key)) ||
+      (candidate.parentIds || []).some((p) => ancestorKeys.includes(String(p))),
+    [],
+  );
+
+  const onRowDragStart = useCallback(
+    (node: FlatTreeNode, e: React.DragEvent) => {
+      const key = String(node.key);
+      const keys = multiSelected.has(key) ? Array.from(multiSelected) : [key];
+      dragKeysRef.current = keys;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", keys.join(","));
+    },
+    [multiSelected],
+  );
+
+  const onRowDragOver = useCallback(
+    (node: FlatTreeNode, e: React.DragEvent) => {
+      const keys = dragKeysRef.current;
+      if (!keys.length || isDescendantOrSelf(node, keys)) {
+        if (dropTarget) setDropTarget(null);
+        return;
+      }
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const y = (e.clientY - rect.top) / Math.max(rect.height, 1);
+      const position: DropPosition = y < 0.25 ? "before" : y > 0.75 ? "after" : "inside";
+      const key = String(node.key);
+      if (!dropTarget || dropTarget.key !== key || dropTarget.position !== position) setDropTarget({ key, position });
+    },
+    [dropTarget, isDescendantOrSelf],
+  );
+
+  const onRowDragEnd = useCallback(() => {
+    dragKeysRef.current = [];
+    setDropTarget(null);
+  }, []);
+
+  const onRowDrop = useCallback(
+    (node: FlatTreeNode, e: React.DragEvent) => {
+      e.preventDefault();
+      const keys = dragKeysRef.current;
+      const target = dropTarget;
+      onRowDragEnd();
+      if (!keys.length || !target || target.key !== String(node.key) || isDescendantOrSelf(node, keys)) return;
+      const parents = node.parentIds || [];
+      const parentId =
+        target.position === "inside" ? String(node.key) : parents.length ? String(parents[parents.length - 1]) : null;
+      if (target.position === "inside" && !node.isExpanded && node.hasChildren) void toggleNode(node);
+      void onMove?.({ ids: keys, targetId: String(node.key), position: target.position, parentId });
+    },
+    [dropTarget, onRowDragEnd, isDescendantOrSelf, onMove, toggleNode],
+  );
+
+  const startEdit = useCallback(
+    (node: FlatTreeNode) => {
+      if (editable) setEditingKey(String(node.key));
+    },
+    [editable],
+  );
+  const cancelEdit = useCallback(() => {
+    setEditingKey(null);
+    setTimeout(() => treeContainerRef.current?.focus({ preventScroll: true }), 0);
+  }, []);
+  const commitEdit = useCallback(
+    (node: FlatTreeNode, value: string) => {
+      setEditingKey(null);
+      setTimeout(() => treeContainerRef.current?.focus({ preventScroll: true }), 0);
+      const name = value.trim();
+      const previousName = String(node.displayName ?? "");
+      if (name && name !== previousName) void onRename?.({ id: String(node.key), name, previousName });
+    },
+    [onRename],
+  );
+
+  /** The context-menu key (or Shift+F10) opens the row's menu at the row, as a right-click would. */
+  const openRowContextMenu = useCallback((node: FlatTreeNode) => {
+    const row = treeContainerRef.current?.querySelector<HTMLElement>(`[data-tree-key="${CSS.escape(String(node.key))}"]`);
+    if (!row) return;
+    const rect = row.getBoundingClientRect();
+    row.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left + 24, clientY: rect.bottom - 4 }),
+    );
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       clearPreservedScrollPaddingEnd();
+      if (editingKey) return;
 
       if (flatTreeData.length === 0) return;
 
@@ -2291,6 +2522,50 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
 
       // Check for keyboard actions (cut, copy, paste, delete)
       const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      // hipc explorer keys
+      if (currentNode && e.key === "F2" && editable) {
+        e.preventDefault();
+        e.stopPropagation();
+        startEdit(currentNode);
+        return;
+      }
+      if (currentNode && (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        openRowContextMenu(currentNode);
+        return;
+      }
+      if (multiSelect && isCtrlOrCmd && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        e.stopPropagation();
+        publishSelectedIds(new Set(flatTreeData.filter((n) => n.selectable).map((n) => String(n.key))));
+        return;
+      }
+      if (multiSelect && e.key === "Escape" && multiSelected.size > 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        publishSelectedIds(new Set(currentNode ? [String(currentNode.key)] : []));
+        return;
+      }
+      // Type-ahead: letters typed in quick succession jump to the next row whose name starts with them.
+      if (e.key.length === 1 && e.key !== " " && !isCtrlOrCmd && !e.altKey) {
+        const now = Date.now();
+        const buffer = (now - typeAheadRef.current.at < 700 ? typeAheadRef.current.text : "") + e.key.toLowerCase();
+        typeAheadRef.current = { text: buffer, at: now };
+        const n = flatTreeData.length;
+        const start = buffer.length === 1 ? currentIndex + 1 : currentIndex;
+        for (let i = 0; i < n; i++) {
+          const idx = (start + i) % n;
+          if (String(flatTreeData[idx].displayName ?? "").toLowerCase().startsWith(buffer)) {
+            e.preventDefault();
+            e.stopPropagation();
+            setFocusedNodeByIndex(idx);
+            return;
+          }
+        }
+        return;
+      }
 
       if (currentNode && isCtrlOrCmd && e.key === "x" && onCutAction) {
         // Cut action (Ctrl/Cmd+X)
@@ -2422,7 +2697,34 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
       onCopyAction,
       onPasteAction,
       onDeleteAction,
+      editingKey,
+      editable,
+      startEdit,
+      openRowContextMenu,
+      multiSelect,
+      multiSelected,
+      publishSelectedIds,
     ],
+  );
+
+  const explorer = useMemo<ExplorerContext>(
+    () => ({
+      draggable,
+      editable,
+      multiSelect,
+      dropTarget,
+      editingKey,
+      onRowDragStart,
+      onRowDragOver,
+      onRowDrop,
+      onRowDragEnd,
+      onRowPointerSelect,
+      startEdit,
+      commitEdit,
+      cancelEdit,
+    }),
+    [draggable, editable, multiSelect, dropTarget, editingKey, onRowDragStart, onRowDragOver, onRowDrop, onRowDragEnd,
+      onRowPointerSelect, startEdit, commitEdit, cancelEdit],
   );
 
   const itemData = useMemo(() => {
@@ -2444,8 +2746,10 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
       expandRotation,
       spinnerDelay,
       renderVersion,
+      explorer,
     };
   }, [
+    explorer,
     flatTreeData,
     toggleNode,
     itemRenderer,
@@ -2466,6 +2770,19 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
   // Shared API implementation to avoid duplication between ref and component APIs
   const treeApiMethods = useMemo(() => {
     return {
+      // hipc explorer: rename a row in place (a context menu's "Rename"), and the rows selected for a bulk action.
+      startRename: (nodeId: string | number) => {
+        if (!editable) return;
+        const index = findNodeIndexById(nodeId);
+        if (index >= 0) setFocusedNodeByIndex(index);
+        setEditingKey(String(nodeId));
+      },
+      getSelectedIds: (): string[] =>
+        multiSelected.size
+          ? Array.from(multiSelected)
+          : effectiveSelectedId !== undefined && effectiveSelectedId !== null
+            ? [String(effectiveSelectedId)]
+            : [],
       // Expansion methods
       expandAll: () => {
         const allIds: (string | number)[] = [];
@@ -3537,6 +3854,8 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
     setNodeStates,
     loadChildren,
     setCollapsedTimestamps,
+    editable,
+    multiSelected,
   ]);
 
   // Register component API methods for external access
@@ -3576,7 +3895,7 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
       className={classnames(styles.wrapper, classes?.[COMPONENT_PART_KEY], className)}
       role="tree"
       aria-label="Tree navigation"
-      aria-multiselectable="false"
+      aria-multiselectable={multiSelect}
       tabIndex={0}
       onFocus={handleTreeFocus}
       onBlur={handleTreeBlur}
@@ -3598,7 +3917,9 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
         {flatTreeData.map((node, index) => {
           const isFirstItem = index === 0;
           const shouldMeasure = isFirstItem && fixedItemSize;
-          const isSelected = String(effectiveSelectedId) === String(node.key);
+          const isSelected = multiSelect && multiSelected.size > 0
+            ? multiSelected.has(String(node.key))
+            : String(effectiveSelectedId) === String(node.key);
           const isFocused = focusedIndex === index && focusedIndex >= 0;
 
           return shouldMeasure ? (

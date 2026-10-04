@@ -60,6 +60,24 @@ $outlineOffset-Tree--focus: createThemeVar("outlineOffset-#{$component}--focus")
       outline: none;
     }
 
+    // hipc explorer: where a dragged row would land — a line above/below, or the row itself outlined (into it).
+    &.dropBefore::before,
+    &.dropAfter::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background-color: $outlineColor-Tree--focus;
+      pointer-events: none;
+    }
+    &.dropBefore::before { top: 0; }
+    &.dropAfter::after { bottom: 0; }
+    &.dropInside {
+      box-shadow: inset 0 0 0 2px $outlineColor-Tree--focus;
+      background-color: $backgroundColor-Tree-row--hover;
+    }
+
     &.selected {
       background-color: $backgroundColor-Tree-row--selected;
       color: $textColor-Tree--selected;
@@ -150,4 +168,17 @@ $outlineOffset-Tree--focus: createThemeVar("outlineOffset-#{$component}--focus")
 // --- We export the theme variables to add them to the component renderer
 :export {
   themeVars: t.json-stringify($themeVars);
+}
+
+// hipc explorer: the inline rename box (F2 / double-click)
+.renameInput {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid $outlineColor-Tree--focus;
+  border-radius: 2px;
+  background: transparent;
+  outline: none;
 }
