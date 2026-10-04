@@ -51,7 +51,7 @@ export const FrameMd = createMetadata({
   contextVars: {
     $frame: {
       description:
-        "Inside a frame: `{ name, url, pick(rows), created(row), cancel(), open(), takesPicks, takesCreated }` — `open()` " +
+        "Inside a frame: `{ name, url(), pick(rows), created(row), cancel(), open(), takesPicks, takesCreated }` — `open()` " +
         "shows the frame's page in the window; `takesCreated`: the host handles a record created in the frame. " +
         "Outside any frame it is undefined.",
       valueType: "any",
@@ -94,9 +94,8 @@ function FrameComponent({
     <FrameRouter src={src} onLocationChange={onLocationChange} registerHandle={registerHandle}>
       {children({
         name,
-        get url() {
-          return urlRef.current;
-        },
+        // A function, not a getter: XMLUI copies context values, and a copy cannot carry an accessor.
+        url: () => urlRef.current,
         // The rows may come as a promise (labels resolved by the page): the host gets them resolved.
         pick: (rows: any[] | Promise<any[]>) => Promise.resolve(rows).then((r) => onPick?.(r)),
         takesPicks: !!onPick,
