@@ -19,9 +19,10 @@ describe("RestApiProxy – 202 Accepted followed by the app", () => {
       return json(201, { created: 2 });
     });
     (globalThis as any).xmluiFollowAccepted = follow;
-    const result = await proxy().execute({ operation: { url: "/api/items/import", method: "post" } });
+    const result = await proxy().execute({ operation: { url: "/api/items/import", method: "post", headers: { Authorization: "Bearer company" } } });
     expect(result).toEqual({ created: 2 });
-    expect(follow).toHaveBeenCalledWith(expect.any(Response), { url: "/api/items/import", method: "post" });
+    expect(follow).toHaveBeenCalledWith(expect.any(Response), expect.objectContaining({ url: "/api/items/import", method: "post" }));
+    expect(follow.mock.calls[0]![1].headers.Authorization).toBe("Bearer company"); // the request's own credentials
   });
 
   it("raises the final response's error as the call's error", async () => {
