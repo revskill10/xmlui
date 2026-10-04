@@ -32,7 +32,9 @@ export function filterSeparators(
   // available inside `renderChild`.
   const itemVisibility = children.map((child) => {
     let hiddenByWhen = false;
-    if (child.when !== undefined) {
+    // hipc: a condition on $context (a ContextMenu's openAt context) is left to the render, where $context is in scope —
+    // evaluated here it is always undetermined, and `!!$context.x` would turn that into "hidden".
+    if (child.when !== undefined && !(typeof child.when === "string" && child.when.includes("$context"))) {
       const whenResult = extractValue(child.when);
       // Treat undefined/null as "can't determine yet → assume visible"
       hiddenByWhen = whenResult !== undefined && whenResult !== null && !whenResult;
