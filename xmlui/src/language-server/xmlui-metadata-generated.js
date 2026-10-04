@@ -21906,6 +21906,21 @@ export default {
         "valueType": "string",
         "defaultValue": "autoLoadAfter"
       },
+      "draggable": {
+        "description": "(hipc) Rows can be dragged onto, before or after other rows (with the multi-selection); see `move`.",
+        "valueType": "boolean",
+        "defaultValue": false
+      },
+      "editable": {
+        "description": "(hipc) F2 or a double-click renames a row in place; see `rename`.",
+        "valueType": "boolean",
+        "defaultValue": false
+      },
+      "multiSelect": {
+        "description": "(hipc) Ctrl/Cmd+click toggles a row, Shift+click selects a range, Ctrl/Cmd+A all, Escape back to one.",
+        "valueType": "boolean",
+        "defaultValue": false
+      },
       "spinnerDelay": {
         "description": "The delay in milliseconds before showing the loading spinner when a node is in loading state. Set to 0 to show immediately, or a higher value to prevent spinner flicker for fast-loading nodes.",
         "valueType": "number",
@@ -21913,6 +21928,27 @@ export default {
       }
     },
     "events": {
+      "move": {
+        "description": "(hipc) Fired when the user drops dragged rows (`draggable`) before, after or into another row. The tree does not change its data: the handler persists the move and refreshes the data. A row is never offered as a target inside itself or its descendants.",
+        "signature": "move(move: { ids: string[]; targetId: string; position: 'before' | 'after' | 'inside'; parentId: string | null }): void",
+        "parameters": {
+          "move": "The dragged ids, the row dropped on, where relative to it, and the parent they would get."
+        }
+      },
+      "rename": {
+        "description": "(hipc) Fired when an inline rename (`editable`: F2, double-click or `startRename`) is committed with a changed, non-empty name.",
+        "signature": "rename(rename: { id: string; name: string; previousName: string }): void",
+        "parameters": {
+          "rename": "The row, its new name and its previous name."
+        }
+      },
+      "selectedIdsDidChange": {
+        "description": "(hipc) Fired when the multi-selection (`multiSelect`) changes.",
+        "signature": "selectedIdsDidChange(ids: string[]): void",
+        "parameters": {
+          "ids": "The selected rows' ids."
+        }
+      },
       "contextMenu": {
         "injectedVars": [
           "$item"
@@ -21981,6 +22017,17 @@ export default {
       }
     },
     "apis": {
+      "startRename": {
+        "description": "(hipc) Opens the inline rename box on a row (`editable`), as F2 does.",
+        "signature": "startRename(nodeId: string | number): void",
+        "parameters": {
+          "nodeId": "The row to rename."
+        }
+      },
+      "getSelectedIds": {
+        "description": "(hipc) The selected rows' ids: the multi-selection, else the selected row.",
+        "signature": "getSelectedIds(): string[]"
+      },
       "expandAll": {
         "description": "Expand all nodes in the tree.",
         "signature": "expandAll(): void"
