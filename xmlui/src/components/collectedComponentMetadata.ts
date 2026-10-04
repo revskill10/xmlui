@@ -208,6 +208,7 @@ import { PaginationMd } from "./Pagination/Pagination";
 import { ResponsiveBarMd } from "./ResponsiveBar/ResponsiveBar";
 import { ScrollViewerMd } from "./ScrollViewer/ScrollViewer";
 import { ContextMenuMd } from "./ContextMenu/ContextMenu";
+import { FrameMd } from "./Frame/Frame";
 import { QRCodeMd } from "./QRCode/QRCode";
 import { IncludeMarkupMd } from "./IncludeMarkup/IncludeMarkup";
 import { StickySectionMd } from "./StickySection/StickySection";
@@ -334,6 +335,7 @@ Object.assign(metadataRegistry, {
   ColorPicker: ColorPickerMd,
   Column: ColumnMd,
   ContextMenu: ContextMenuMd,
+  Frame: FrameMd,
   ContentSeparator: ContentSeparatorMd,
   DataSource: DataSourceMd,
   DatePicker: DatePickerMd,

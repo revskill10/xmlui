@@ -4803,6 +4803,70 @@ export default {
       "borderRadius-ContextMenu": "$borderRadius"
     }
   },
+  "Frame": {
+    "status": "experimental",
+    "description": "(hipc, RFC 051) `Frame` shows a page of this app — by its URL — inside the current page, without an iframe. Its children (normally the app's routes) render with a frame-local location: inside, `$pathname`, `$routeParams`, `$queryParams`, links and `navigate()` are the frame's, so the window's URL never changes. Session, data, theme and globals are the host's. A framed page talks to its host through `$frame`.",
+    "props": {
+      "src": {
+        "description": "The URL of the page to show (path, query and hash of this app).",
+        "valueType": "string"
+      },
+      "name": {
+        "description": "A name for the frame (for its host's bookkeeping).",
+        "valueType": "string"
+      }
+    },
+    "events": {
+      "pick": {
+        "description": "A framed page picked rows (`$frame.pick(rows)`, e.g. a list's Confirm).",
+        "signature": "pick(rows: any[]): void",
+        "parameters": {
+          "rows": "The picked rows (with their labels)."
+        }
+      },
+      "created": {
+        "description": "A framed create page saved a record (`$frame.created(row)`).",
+        "signature": "created(row: any): void",
+        "parameters": {
+          "row": "The record as saved (with its label)."
+        }
+      },
+      "cancel": {
+        "description": "A framed page asked to be closed (`$frame.cancel()`).",
+        "signature": "cancel(): void"
+      },
+      "navigate": {
+        "description": "The frame moved to another URL (inside the frame).",
+        "signature": "navigate(url: string): void",
+        "parameters": {
+          "url": "The frame's new URL."
+        }
+      }
+    },
+    "apis": {
+      "reload": {
+        "description": "Renders the frame's page again (its data is fetched again).",
+        "signature": "reload(): void"
+      },
+      "navigate": {
+        "description": "Moves the frame to another URL of this app.",
+        "signature": "navigate(to: string): void",
+        "parameters": {
+          "to": "The URL."
+        }
+      },
+      "current": {
+        "description": "The frame's current URL.",
+        "signature": "current(): string"
+      }
+    },
+    "contextVars": {
+      "$frame": {
+        "description": "Inside a frame: `{ name, url, pick(rows), created(row), cancel(), open() }` — `open()` shows the frame's page in the window instead. Outside any frame it is undefined.",
+        "valueType": "any"
+      }
+    }
+  },
   "ContentSeparator": {
     "status": "stable",
     "description": "`ContentSeparator` creates visual dividers between content sections using horizontal or vertical lines. It's essential for improving readability by breaking up dense content, separating list items, or creating clear boundaries between different UI sections.",

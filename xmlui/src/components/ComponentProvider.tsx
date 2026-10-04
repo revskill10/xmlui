@@ -110,6 +110,7 @@ import {
   subMenuItemRenderer,
 } from "./DropdownMenu/DropdownMenu";
 import { contextMenuComponentRenderer } from "./ContextMenu/ContextMenu";
+import { frameComponentRenderer } from "./Frame/Frame";
 import { expandableItemComponentRenderer } from "./ExpandableItem/ExpandableItem";
 import { themeComponentRenderer } from "./Theme/Theme";
 import { merge } from "lodash-es";
@@ -651,6 +652,8 @@ export class ComponentRegistry {
       this.registerCoreComponent(subMenuItemRenderer);
       this.registerCoreComponent(menuSeparatorRenderer);
       this.registerCoreComponent(contextMenuComponentRenderer);
+      // hipc (RFC 051): a page of this app shown in place, by URL.
+      this.registerCoreComponent(frameComponentRenderer);
       this.registerCoreComponent(expandableItemComponentRenderer);
       this.registerCoreComponent(tabsComponentRenderer);
       this.registerCoreComponent(stepperComponentRenderer);
