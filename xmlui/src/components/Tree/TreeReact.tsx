@@ -64,6 +64,13 @@ interface RowContext {
 
 export type DropPosition = "before" | "after" | "inside";
 
+/** Upper quarter of a row: before it; lower quarter: after it; the middle: into it. */
+function dropPositionOf(e: React.DragEvent): DropPosition {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const y = (e.clientY - rect.top) / Math.max(rect.height, 1);
+  return y < 0.25 ? "before" : y > 0.75 ? "after" : "inside";
+}
+
 interface ExplorerContext {
   draggable: boolean;
   editable: boolean;
@@ -2447,9 +2454,7 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
       }
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const y = (e.clientY - rect.top) / Math.max(rect.height, 1);
-      const position: DropPosition = y < 0.25 ? "before" : y > 0.75 ? "after" : "inside";
+      const position = dropPositionOf(e);
       const key = String(node.key);
       if (!dropTarget || dropTarget.key !== key || dropTarget.position !== position) setDropTarget({ key, position });
     },
@@ -2465,16 +2470,17 @@ export const TreeComponent = memo((props: TreeComponentProps) => {
     (node: FlatTreeNode, e: React.DragEvent) => {
       e.preventDefault();
       const keys = dragKeysRef.current;
-      const target = dropTarget;
+      // Where it lands is read from the drop itself: the last drag-over's state may not have rendered yet.
+      const target = { key: String(node.key), position: dropPositionOf(e) };
       onRowDragEnd();
-      if (!keys.length || !target || target.key !== String(node.key) || isDescendantOrSelf(node, keys)) return;
+      if (!keys.length || isDescendantOrSelf(node, keys)) return;
       const parents = node.parentIds || [];
       const parentId =
         target.position === "inside" ? String(node.key) : parents.length ? String(parents[parents.length - 1]) : null;
       if (target.position === "inside" && !node.isExpanded && node.hasChildren) void toggleNode(node);
       void onMove?.({ ids: keys, targetId: String(node.key), position: target.position, parentId });
     },
-    [dropTarget, onRowDragEnd, isDescendantOrSelf, onMove, toggleNode],
+    [onRowDragEnd, isDescendantOrSelf, onMove, toggleNode],
   );
 
   const startEdit = useCallback(
