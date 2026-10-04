@@ -214,6 +214,20 @@ function isURLSameOrigin(url: string): boolean {
   );
 }
 
+/**
+ * "202 Accepted" (RFC 9110 §15.3.3): the server took the request and will answer later. When the app registers a follower
+ * — `window.xmluiFollowAccepted(response, { url, method })` resolving to the final Response — every API call (APICall,
+ * DataSource, Form) continues with that final response, as if the server had answered at once. Without one, a 202 is
+ * handed over as it is. How "later" is reached (polling a job, a stream) is the app's protocol, not xmlui's.
+ */
+async function followAccepted(response: Response, url: string, method: string): Promise<Response> {
+  const follow = (globalThis as any).xmluiFollowAccepted as
+    | ((response: Response, request: { url: string; method: string }) => Promise<Response>)
+    | undefined;
+  if (response?.status !== 202 || typeof follow !== "function") return response;
+  return await follow(response, { url, method });
+}
+
 export default class RestApiProxy {
   private config: RestAPIAdapterPropsV2;
   private appContext?: AppContextObject;
@@ -719,11 +733,12 @@ export default class RestApiProxy {
       ...(credentials && { credentials }),
     };
     if (onUploadProgress) {
-      const response = await this.executeWithUploadProgress({
+      let response = await this.executeWithUploadProgress({
         url,
         options,
         onUploadProgress,
       });
+      response = await followAccepted(response, url, method);
       setLastApiStatus(transactionId, response?.status);
       if (!response.ok) {
         throw await this.raiseError(response);
@@ -743,6 +758,7 @@ export default class RestApiProxy {
       } else {
         response = await fetch(url, options);
       }
+      response = await followAccepted(response, url, method);
       if (!response.clone().ok) {
         throw await this.raiseError(response);
       }
