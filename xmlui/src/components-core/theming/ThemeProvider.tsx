@@ -111,26 +111,79 @@ function sanitizeThemeVarsForStrictTheming(
   ) as Record<string, string>;
 }
 
-export function useCompiledTheme(
+/** The compiled form of a theme, shared by every Theme with the same content — computed once per distinct theme content, tone and
+ *  strictness, for one component registry, theme list and resource set. A nested `<Theme>` that only overrides a few
+ *  variables used to recompile and revalidate the whole theme for every instance on the page. */
+type CompiledTheme = {
+  getResourceUrl: (resourceString?: string) => string | undefined;
+  fontLinks: Array<string>;
+  allFonts: Array<FontDef>;
+  themeDefChain: ThemeDefinition[] | undefined;
+  allThemeVarsWithResolvedHierarchicalVars: Record<string, string>;
+  themeCssVars: Record<string, string>;
+  invalidThemeVarNames: Set<string>;
+  getThemeVar: (varName: string) => string | undefined;
+};
+const compiledThemes = new WeakMap<object, WeakMap<object, WeakMap<object, WeakMap<object, Map<string, CompiledTheme>>>>>();
+const COMPILED_PER_CONTEXT = 64;
+function compiledThemeKey(activeTheme: ThemeDefinition | undefined, activeTone: ThemeTone, strictTheming?: boolean, strictAccessibility?: boolean) {
+  if (!activeTheme) return `none|${activeTone}`;
+  // A theme's id names it for `extends`; it does not shape its compiled form — nested Themes get a generated id each.
+  const { id: _id, ...content } = activeTheme;
+  return `${activeTone}|${!!strictTheming}|${!!strictAccessibility}|${JSON.stringify(content)}`;
+}
+function cachedCompiledTheme(
+  componentRegistry: ReturnType<typeof useComponentRegistry>,
   activeTheme: ThemeDefinition | undefined,
   activeTone: ThemeTone,
-  themes: ThemeDefinition[] = EMPTY_ARRAY,
-  resources: Record<string, string> = EMPTY_OBJECT,
-  resourceMap: Record<string, string> = EMPTY_OBJECT,
+  themes: ThemeDefinition[],
+  resources: Record<string, string>,
+  resourceMap: Record<string, string>,
   strictTheming?: boolean,
   strictAccessibility?: boolean,
-) {
-  const componentRegistry = useComponentRegistry();
+): CompiledTheme {
+  const level = <K extends object, V>(map: WeakMap<K, V>, key: K, make: () => V) => {
+    let v = map.get(key);
+    if (!v) { v = make(); map.set(key, v); }
+    return v;
+  };
+  const byKey = level(level(level(level(compiledThemes, componentRegistry as object, () => new WeakMap()), themes, () => new WeakMap()), resources, () => new WeakMap()), resourceMap, () => new Map<string, CompiledTheme>());
+  const key = compiledThemeKey(activeTheme, activeTone, strictTheming, strictAccessibility);
+  const hit = byKey.get(key);
+  if (hit) {
+    byKey.delete(key);
+    byKey.set(key, hit); // most recently used last
+    return hit;
+  }
+  const compiled = compileTheme(componentRegistry, activeTheme, activeTone, themes, resources, resourceMap, strictTheming, strictAccessibility);
+  byKey.set(key, compiled);
+  if (byKey.size > COMPILED_PER_CONTEXT) byKey.delete(byKey.keys().next().value!);
+  return compiled;
+}
+
+/** Exported for tests: identical inputs compile to the very same object. */
+export const __compiledThemeForTests = cachedCompiledTheme;
+
+function compileTheme(
+  componentRegistry: ReturnType<typeof useComponentRegistry>,
+  activeTheme: ThemeDefinition | undefined,
+  activeTone: ThemeTone,
+  themes: ThemeDefinition[],
+  resources: Record<string, string>,
+  resourceMap: Record<string, string>,
+  strictTheming?: boolean,
+  strictAccessibility?: boolean,
+): CompiledTheme {
   const { componentThemeVars, componentDefaultThemeVars, componentThemeVarDeclarations } = componentRegistry;
 
-  const themeDefChain = useMemo(() => {
+  const themeDefChain = (() => {
     if (activeTheme) {
       return collectThemeChainByExtends(activeTheme, themes, componentDefaultThemeVars);
     }
     return undefined;
-  }, [activeTheme, componentDefaultThemeVars, themes]);
+  })();
 
-  const allResources = useMemo(() => {
+  const allResources = (() => {
     let mergedResources: ThemeDefinition["resources"] = {};
     themeDefChain?.forEach((theme) => {
       mergedResources = {
@@ -143,9 +196,9 @@ export function useCompiledTheme(
       ...resources,
       ...mergedResources,
     };
-  }, [themeDefChain, resources, activeTone]);
+  })();
 
-  const allFonts = useMemo(() => {
+  const allFonts = (() => {
     const ret: Array<FontDef> = [];
     Object.entries(allResources).forEach(([key, value]) => {
       if (key.startsWith("font.")) {
@@ -153,10 +206,9 @@ export function useCompiledTheme(
       }
     });
     return ret;
-  }, [allResources]);
+  })();
 
-  const getResourceUrl = useCallback(
-    (resourceString?: string) => {
+  const getResourceUrl = (resourceString?: string) => {
       let resourceUrl = resourceString;
       if (resourceString?.startsWith("resource:")) {
         const resourceName = resourceString?.replace("resource:", "");
@@ -172,25 +224,21 @@ export function useCompiledTheme(
         return resourceMap[resourceUrl.substring(1)];
       }
       return normalizePath(resourceUrl);
-    },
-    [allResources, resourceMap],
-  );
+    };
 
-  const fontLinks: Array<string> = useMemo(() => {
+  const fontLinks: Array<string> = (() => {
     return (allFonts?.filter((theme) => typeof theme === "string") || []) as Array<string>;
-  }, [allFonts]);
+  })();
 
-  const declaredThemeVarNames = useMemo(() => {
+  const declaredThemeVarNames = (() => {
     const known = new Set<string>();
     Object.keys(themeVars.themeVars).forEach((name) => addKnownThemeVarName(known, name));
     componentThemeVars.forEach((name) => addKnownThemeVarName(known, name));
     collectThemeVarKeys(componentDefaultThemeVars).forEach((name) => addKnownThemeVarName(known, name));
     return known;
-  }, [componentDefaultThemeVars, componentThemeVars]);
+  })();
 
-  const [themeDefChainVars, layerInvalidThemeVarNames, layerThemeDiagnostics] = useMemo<
-    [Array<Record<string, string>>, Set<string>, Array<ThemeDiagnostic>]
-  >(() => {
+  const [themeDefChainVars, layerInvalidThemeVarNames, layerThemeDiagnostics] = (() => {
     if (!themeDefChain?.length) {
       return [[], new Set<string>(), []];
     }
@@ -262,9 +310,9 @@ export function useCompiledTheme(
       ),
     ];
     return [resultedTheme, invalidNames, layerDiagnostics];
-  }, [activeTone, componentThemeVarDeclarations, declaredThemeVarNames, strictTheming, themeDefChain]);
+  })();
 
-  const knownThemeVarNames = useMemo(() => {
+  const knownThemeVarNames = (() => {
     const known = new Set(declaredThemeVarNames);
     themeDefChainVars?.forEach((theme) => {
       const generated = {
@@ -280,9 +328,9 @@ export function useCompiledTheme(
       Object.keys(generated).forEach((key) => addKnownThemeVarName(known, key));
     });
     return known;
-  }, [declaredThemeVarNames, themeDefChainVars]);
+  })();
 
-  const [allThemeVarsWithResolvedHierarchicalVars, rawAllThemeVars, invalidThemeVarNames] = useMemo(() => {
+  const [allThemeVarsWithResolvedHierarchicalVars, rawAllThemeVars, invalidThemeVarNames] = (() => {
     let mergedThemeVars: Record<string, string> = {};
 
     themeDefChainVars?.forEach((theme) => {
@@ -366,9 +414,9 @@ export function useCompiledTheme(
     }
 
     return [resolveThemeVarsWithCssVars(rawVars), rawVars, new Set<string>()];
-  }, [componentThemeVarDeclarations, componentThemeVars, knownThemeVarNames, layerInvalidThemeVarNames, layerThemeDiagnostics, strictAccessibility, strictTheming, themeDefChainVars]);
+  })();
 
-  const themeCssVars = useMemo(() => {
+  const themeCssVars = (() => {
     const ret: Record<string, string> = {};
     Object.entries(allThemeVarsWithResolvedHierarchicalVars).forEach(([key, value]) => {
       const themeKey = `--${themeVars.keyPrefix}-${key}`;
@@ -377,13 +425,28 @@ export function useCompiledTheme(
       }
     });
     return ret;
-  }, [allThemeVarsWithResolvedHierarchicalVars]);
+  })();
 
-  const getThemeVar = useCallback(
-    (varName: string) => {
+  const getThemeVar = (varName: string) => {
       return resolveThemeVar(varName, rawAllThemeVars);
-    },
-    [rawAllThemeVars],
+    };
+
+  return { getResourceUrl, fontLinks, allFonts, themeDefChain, allThemeVarsWithResolvedHierarchicalVars, themeCssVars, invalidThemeVarNames, getThemeVar };
+}
+
+export function useCompiledTheme(
+  activeTheme: ThemeDefinition | undefined,
+  activeTone: ThemeTone,
+  themes: ThemeDefinition[] = EMPTY_ARRAY,
+  resources: Record<string, string> = EMPTY_OBJECT,
+  resourceMap: Record<string, string> = EMPTY_OBJECT,
+  strictTheming?: boolean,
+  strictAccessibility?: boolean,
+) {
+  const componentRegistry = useComponentRegistry();
+  const { getResourceUrl, fontLinks, allFonts, themeDefChain, allThemeVarsWithResolvedHierarchicalVars, themeCssVars, invalidThemeVarNames, getThemeVar } = useMemo(
+    () => cachedCompiledTheme(componentRegistry, activeTheme, activeTone, themes, resources, resourceMap, strictTheming, strictAccessibility),
+    [componentRegistry, activeTheme, activeTone, themes, resources, resourceMap, strictTheming, strictAccessibility],
   );
 
   useEffect(() => {
