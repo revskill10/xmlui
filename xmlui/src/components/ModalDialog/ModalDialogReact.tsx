@@ -111,7 +111,8 @@ export const ModalDialogFrame = React.forwardRef(
   },
 );
 
-const ModalStateContext = React.createContext<ModalStateValue | null>(null);
+// hipc (RFC 051): exported so a Frame can start its pages outside the dialog that shows it.
+export const ModalStateContext = React.createContext<ModalStateValue | null>(null);
 
 function useModalLocalOpenState(
   isInitiallyOpen?: boolean,

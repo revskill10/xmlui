@@ -15,6 +15,8 @@ import {
 } from "react-router-dom";
 import { AppContext, useAppContext } from "../../components-core/AppContext";
 import { createUrlWithQueryParams } from "../component-utils";
+import { ModalStateContext } from "../ModalDialog/ModalDialogReact";
+import { ModalVisibilityContext } from "../ModalDialog/ModalVisibilityContext";
 
 export interface FrameHandle {
   /** The frame's current URL (path + query + hash). */
@@ -135,9 +137,15 @@ export function FrameRouter({
       <RouteContext.Provider value={FRESH_ROUTES as any}>
       <Router location={location} navigator={navigator}>
         <AppContext.Provider value={frameAppContext as any}>
-          <div key={generation} data-frame="" style={{ display: "contents" }}>
-            {children}
-          </div>
+          {/* A framed page is a page, not the content of the dialog that shows it: its own dialogs and forms neither
+              share that dialog's open state and close guard nor close it. */}
+          <ModalStateContext.Provider value={null}>
+            <ModalVisibilityContext.Provider value={null}>
+              <div key={generation} data-frame="" style={{ display: "contents" }}>
+                {children}
+              </div>
+            </ModalVisibilityContext.Provider>
+          </ModalStateContext.Provider>
         </AppContext.Provider>
       </Router>
       </RouteContext.Provider>
