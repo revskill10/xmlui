@@ -7,6 +7,7 @@ import {
   type Navigator,
   type To,
   UNSAFE_LocationContext as LocationContext,
+  UNSAFE_RouteContext as RouteContext,
   Router,
   createPath,
   parsePath,
@@ -22,6 +23,7 @@ export interface FrameHandle {
   reload: () => void;
 }
 
+const FRESH_ROUTES = { outlet: null, matches: [], isDataRoute: false };
 let frameKeys = 0;
 const toLocation = (to: string | Partial<Location>, base: string): Location => {
   const path = typeof to === "string" ? parsePath(to) : to;
@@ -127,8 +129,10 @@ export function FrameRouter({
   );
 
   return (
-    // The host's router stays outside: a frame is a router of its own, so the nesting guard is reset at the boundary.
+    // The host's router stays outside: a frame is a router of its own — its location and its route matches start
+    // afresh at the boundary (else its routes would match only what is left after the host's matched parent route).
     <LocationContext.Provider value={null as any}>
+      <RouteContext.Provider value={FRESH_ROUTES as any}>
       <Router location={location} navigator={navigator}>
         <AppContext.Provider value={frameAppContext as any}>
           <div key={generation} data-frame="" style={{ display: "contents" }}>
@@ -136,6 +140,7 @@ export function FrameRouter({
           </div>
         </AppContext.Provider>
       </Router>
+      </RouteContext.Provider>
     </LocationContext.Provider>
   );
 }
