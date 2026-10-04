@@ -4862,7 +4862,7 @@ export default {
     },
     "contextVars": {
       "$frame": {
-        "description": "Inside a frame: `{ name, url, pick(rows), created(row), cancel(), open() }` — `open()` shows the frame's page in the window instead. Outside any frame it is undefined.",
+        "description": "Inside a frame: `{ name, url, pick(rows), created(row), cancel(), open(), takesPicks, takesCreated }` — `open()` shows the frame's page in the window; `takesCreated`: the host handles a record created in the frame. Outside any frame it is undefined.",
         "valueType": "any"
       }
     }

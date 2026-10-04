@@ -42,6 +42,8 @@ const LEGACY_PROPAGATED_CONTEXT_VARS = [
   "$isFirst",
   "$isLast",
   "$context",
+  // hipc (RFC 051): the Frame a page is shown in — ambient for everything inside it, like $context.
+  "$frame",
 ] as const;
 const RESERVED_RECEIVED_CONTEXT_VARS = new Set(["$props", "$self", "$this"]);
 
