@@ -549,6 +549,8 @@ export const FormItem = memo(forwardRef(function FormItem({
         validationResult={validationResult}
         layoutContext={layoutContext}
         compactInlineLabel={type === "checkbox" || type === "switch"}
+        // hipc: an item in error says so, for the form to take the user there after a failed submit.
+        data-validation={validationStatus === "error" ? "error" : undefined}
       >
         {formControl}
       </ItemWithLabel>

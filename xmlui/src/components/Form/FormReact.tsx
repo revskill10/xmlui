@@ -85,6 +85,25 @@ import { pushXsLog } from "../../components-core/inspector/inspectorUtils";
 const PART_CANCEL_BUTTON = "cancelButton";
 const PART_SUBMIT_BUTTON = "submitButton";
 
+/**
+ * hipc: after a submit fails validation (on the client, across fields or from the server), take the user to the first
+ * field in error — scrolled into view and focused — once the errors are rendered.
+ */
+function focusFirstInvalid(form: HTMLFormElement | null) {
+  if (!form || typeof window === "undefined") return;
+  window.requestAnimationFrame(() =>
+    window.requestAnimationFrame(() => {
+      const item = form.querySelector<HTMLElement>('[data-validation="error"]');
+      if (!item) return;
+      const target = item.querySelector<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]',
+      );
+      item.scrollIntoView({ block: "center" });
+      target?.focus({ preventScroll: true });
+    }),
+  );
+}
+
 export const getByPath = (obj: any, path: string) => {
   return get(obj, path);
 };
@@ -656,6 +675,7 @@ const Form = memo(forwardRef(function (
     const validationResult = doValidate();
 
     if (!validationResult.isValid) {
+      focusFirstInvalid(formRef.current);
       // Notify any listeners that a submit attempt was rejected. This is the only signal
       // available to consumers (e.g., wrappers like TabsForm) that wish to react to a
       // failed submit, since neither `willSubmit` nor `submit` fires when validation fails.
@@ -773,6 +793,7 @@ const Form = memo(forwardRef(function (
         );
       }
       if (hasCrossFieldErrors) {
+        focusFirstInvalid(formRef.current);
         try {
           await onSubmitFailed?.({
             ...validationResult,
@@ -946,6 +967,7 @@ const Form = memo(forwardRef(function (
           fieldValidationResults,
         }),
       );
+      focusFirstInvalid(formRef.current);
       try {
         onSubmitError?.(e, problem);
       } catch (handlerErr) {
