@@ -717,11 +717,17 @@ function findClosest(theme: Record<string, string>, themeVarName: string) {
   return null;
 }
 
+/** Every variable of a theme resolved. The generators each need it for the same theme object (five of them, for the
+ *  merged theme and for every layer of a compile), so it is computed once per object; callers only read it. */
+const resolvedThemes = new WeakMap<Record<string, string>, Record<string, string>>();
 function resolveThemeVars(theme: Record<string, string>) {
+  const known = resolvedThemes.get(theme);
+  if (known) return known;
   const ret: Record<string, string> = {};
   Object.keys(theme).forEach((key) => {
     ret[key] = resolveThemeVar(key, theme);
   });
+  resolvedThemes.set(theme, ret);
   return ret;
 }
 
