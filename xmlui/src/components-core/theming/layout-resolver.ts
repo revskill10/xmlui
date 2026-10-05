@@ -55,6 +55,11 @@ export function resolveLayoutProps(
     issues: new Set(),
   };
 
+  // --- Responsive variants (width-md, padding-xs, …) are rare: look them up only when the component declares one.
+  // --- Without any, every variant is undefined and the plain value wins — the same result, without ~600 key builds
+  // --- and lookups per render.
+  const responsive = hasResponsiveVariant(layoutProps);
+
   // --- "dims" mode: only allow dimension properties
   const dimsOnly = mode === "dims";
   // --- "spacing" mode: allow dimensions + padding + margin + gap
@@ -308,7 +313,7 @@ export function resolveLayoutProps(
   // --- Replaces all variable occurrences in the input string with the result of toCssVar
   function transformLayoutValue(prop: string): string {
     const defValue = resolveSingleValue();
-    if (layoutContext?.mediaSize?.sizeIndex !== undefined) {
+    if (responsive && layoutContext?.mediaSize?.sizeIndex !== undefined) {
       const sizeIndex = layoutContext.mediaSize?.sizeIndex;
       const xsValue = resolveSingleValue("xs");
       const smValue = resolveSingleValue("sm");
@@ -436,6 +441,14 @@ export function resolveLayoutProps(
  * Converts the specified themeID to a CSS var string
  * @param c segment to convert
  */
+const RESPONSIVE_SUFFIX = /-(xs|sm|md|lg|xl|xxl)$/;
+/** Does the component declare any size-specific layout value (`<prop>-<xs|sm|md|lg|xl|xxl>`)? */
+function hasResponsiveVariant(layoutProps: LayoutProps): boolean {
+  if (!layoutProps || typeof layoutProps !== "object") return false;
+  for (const key in layoutProps) if (RESPONSIVE_SUFFIX.test(key)) return true;
+  return false;
+}
+
 export function toCssVar(c: string): string {
   return `var(--${THEME_VAR_PREFIX}-${c.substring(1)})`;
 }

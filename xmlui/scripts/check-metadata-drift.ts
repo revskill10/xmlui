@@ -112,7 +112,8 @@ export function checkMetadataDrift(
       issues.push({
         componentName,
         metadataExport,
-        sourceFile: path.relative(repoRoot, sourceFile),
+        // Reported with forward slashes on every platform.
+        sourceFile: path.relative(repoRoot, sourceFile).split(path.sep).join("/"),
         missingProps,
       });
     }

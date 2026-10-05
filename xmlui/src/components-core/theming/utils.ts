@@ -45,10 +45,42 @@ export const SizeScaleReadableKeys = {
  * values. Base variables inherit through CSS anyway, so nothing else changes.
  */
 export function useComponentThemeClass(descriptor: ComponentMetadata, { componentScopedOnly = false } = {}) {
-  let themeScope = useTheme();
+  const themeScope = useTheme();
   const componentRegistry = useComponentRegistry();
+  const themeVars = useMemo(
+    () => cachedComponentThemeVars(componentRegistry, themeScope, descriptor, componentScopedOnly),
+    [componentRegistry, themeScope, themeScope.themeVars, descriptor, componentScopedOnly],
+  );
+  return useStyles(themeVars);
+}
 
-  const themeVars = useMemo(() => {
+/** The pinned variables of one component type in one theme scope: the same for every instance, so computed once
+ *  (a page renders hundreds of Texts, Buttons, Stacks in a handful of scopes). */
+const componentThemeVarsCache = new WeakMap<object, WeakMap<object, WeakMap<object, Record<string, string>[]>>>();
+function cachedComponentThemeVars(
+  componentRegistry: ReturnType<typeof useComponentRegistry>,
+  themeScope: ReturnType<typeof useTheme>,
+  descriptor: ComponentMetadata,
+  componentScopedOnly: boolean,
+): Record<string, string> {
+  if (!descriptor || !themeScope?.themeVars) return computeComponentThemeVars(componentRegistry, themeScope, descriptor, componentScopedOnly);
+  const level = <K extends object, V>(map: WeakMap<K, V>, key: K, make: () => V) => {
+    let v = map.get(key);
+    if (!v) { v = make(); map.set(key, v); }
+    return v;
+  };
+  const byDescriptor = level(level(componentThemeVarsCache, componentRegistry as object, () => new WeakMap()), themeScope.themeVars, () => new WeakMap());
+  const slots = level(byDescriptor, descriptor as object, () => []);
+  const slot = componentScopedOnly ? 1 : 0;
+  return (slots[slot] ??= computeComponentThemeVars(componentRegistry, themeScope, descriptor, componentScopedOnly));
+}
+
+function computeComponentThemeVars(
+  componentRegistry: ReturnType<typeof useComponentRegistry>,
+  themeScope: ReturnType<typeof useTheme>,
+  descriptor: ComponentMetadata,
+  componentScopedOnly: boolean,
+): Record<string, string> {
     const ret = {};
 
     // --- Theme vars defined by the component itself
@@ -87,15 +119,4 @@ export function useComponentThemeClass(descriptor: ComponentMetadata, { componen
     });
 
     return ret;
-  }, [
-    descriptor?.themeVars,
-    descriptor?.defaultThemeVars,
-    descriptor?.themeVarContributorComponents,
-    componentScopedOnly,
-    themeScope,
-    themeScope.themeVars,
-    componentRegistry,
-  ]);
-
-  return useStyles(themeVars);
 }

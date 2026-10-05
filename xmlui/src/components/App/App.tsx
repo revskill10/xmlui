@@ -140,6 +140,7 @@ export const AppMd = createMetadata({
         "`<navPanelId>.collapsed`.",
       valueType: "string",
       availableValues: ["hidden", "icons"],
+      isStrictEnum: true,
       defaultValue: defaultProps.navPanelCollapseMode,
     },
     navPanelCollapsed: {
