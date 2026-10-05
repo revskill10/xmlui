@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { flushSync } from "react-dom";
+import { ProgressBar } from "../ProgressBar/ProgressBarReact";
 import produce from "immer";
 
 import styles from "./Form.module.scss";
@@ -320,7 +321,14 @@ type OnSuccess = (result: any) => Promise<void>;
 type OnCancel = () => void;
 type OnReset = () => void;
 type OnDirtyChanged = (dirty: boolean) => void | Promise<void>;
+/** How far a submission answered "later" (202 Accepted) is, as the app's follower reports it: `done` of `total`, and a
+ *  note — an i18n key with its values. */
+export type RunProgress = { type: "run"; status?: string; done?: number; total?: number; note?: { key: string; values?: Record<string, unknown> } };
+
 type Props = {
+  /** A submission running in the background reports here; shown under the buttons while it lasts. */
+  runProgress?: RunProgress | null;
+  clearRunProgress?: () => void;
   formState: FormState;
   dispatch: Dispatch<ContainerAction | FormAction>;
   id?: string;
@@ -428,6 +436,8 @@ const Form = memo(forwardRef(function (
     style,
     className,
     classes,
+    runProgress,
+    clearRunProgress,
     enabled = true,
     cancelLabel,
     cancelButtonVisible = defaultProps.cancelButtonVisible,
@@ -1144,6 +1154,24 @@ const Form = memo(forwardRef(function (
     doCancelSubmit,
   ]);
 
+  // A new submission starts with no figure of its own (never the last one's).
+  useEffect(() => {
+    if (formState.submitInProgress) clearRunProgress?.();
+  }, [formState.submitInProgress, clearRunProgress]);
+  const runProgressText = runProgress?.note?.key
+    ? appContext.App.translate(runProgress.note.key, runProgress.note.values)
+    : typeof runProgress?.done === "number"
+      ? typeof runProgress.total === "number" ? `${runProgress.done} / ${runProgress.total}` : String(runProgress.done)
+      : "";
+  const submitProgress = formState.submitInProgress && runProgress ? (
+    <div className={styles.submitProgress} role="status" aria-live="polite" data-part-id="submitProgress">
+      {typeof runProgress.done === "number" && typeof runProgress.total === "number" && runProgress.total > 0 && (
+        <ProgressBar value={Math.min(1, runProgress.done / runProgress.total)} />
+      )}
+      {runProgressText && <span className={styles.submitProgressText}>{runProgressText}</span>}
+    </div>
+  ) : null;
+
   let safeButtonRow = (
     <>
       {buttonRow || (
@@ -1170,6 +1198,7 @@ const Form = memo(forwardRef(function (
         <ValidationSummary generalValidationResults={formState.generalValidationResults} />
         <FormContext.Provider value={formContextValue}>{children}</FormContext.Provider>
         {!hideButtonRow && (!hideButtonRowUntilDirty || isDirty) && safeButtonRow}
+        {submitProgress}
       </form>
       {confirmSubmitModalVisible && (
         <ModalDialog
@@ -1230,6 +1259,12 @@ export const FormWithContextVar = forwardRef(function (
   ref: ForwardedRef<HTMLDivElement>,
 ) {
   const [formState, dispatch] = useReducer(formReducer, initialState);
+  // How far a submission answered 202 is (the app's follower reports it; only `type: "run"` reports — never an upload's).
+  const [runProgress, setRunProgress] = useState<RunProgress | null>(null);
+  const reportRunProgress = useCallback((p: unknown) => {
+    if (p && typeof p === "object" && (p as RunProgress).type === "run") setRunProgress(p as RunProgress);
+  }, []);
+  const clearRunProgress = useCallback(() => setRunProgress(null), []);
   // --- W5-2: registry that <FormValidator> children populate via
   // FormValidatorRegistryContext. Stable across renders.
   const crossFieldValidatorsRef = useRef<Map<string, FormValidatorDef>>(new Map());
@@ -1392,6 +1427,8 @@ export const FormWithContextVar = forwardRef(function (
         validationIconError={extractValue.asOptionalString(node.props.validationIconError)}
         formState={formState}
         dispatch={dispatch}
+        runProgress={runProgress}
+        clearRunProgress={clearRunProgress}
         id={node.uid}
         classes={classes}
         cancelLabel={extractValue(node.props.cancelLabel)}
@@ -1408,13 +1445,14 @@ export const FormWithContextVar = forwardRef(function (
         })}
         onSubmit={lookupEventHandler("submit", {
           defaultHandler: submitUrl
-            ? `(eventArgs)=> Actions.callApi({ url: "${submitUrl}", method: "${submitMethod}", body: eventArgs, inProgressNotificationMessage: "${inProgressNotificationMessage}", completedNotificationMessage: "${completedNotificationMessage}", errorNotificationMessage: "${errorNotificationMessage}", throwOnError: true${submitHeaders ? ", headers: $formHeaders" : ""} })`
+            ? `(eventArgs)=> Actions.callApi({ url: "${submitUrl}", method: "${submitMethod}", body: eventArgs, inProgressNotificationMessage: "${inProgressNotificationMessage}", completedNotificationMessage: "${completedNotificationMessage}", errorNotificationMessage: "${errorNotificationMessage}", throwOnError: true${submitHeaders ? ", headers: $formHeaders" : ""}, onProgress: $formProgress })`
             : undefined,
           signError: submitUrl && !node.events?.submit ? false : undefined,
           context: {
             $data,
             $formCancel,
             $formHeaders: submitHeaders,
+            $formProgress: reportRunProgress,
             $formCsrfToken: csrfToken,
             $formIdempotencyKey: idempotencyKey,
           },

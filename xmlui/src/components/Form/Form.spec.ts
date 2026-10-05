@@ -5136,3 +5136,40 @@ test(`submit with UDC bindTo inside FormItem type='items' collects correct data`
     items: [{ name: "Alice" }, { name: "Bob" }],
   });
 });
+
+// A submission the server answers "later" (202 Accepted, followed by the app): how far the work is shows under the
+// buttons while it lasts — the app's follower reports it to the form — and the form carries on when it ends.
+test("a submission answered 202 shows its progress under the buttons, then carries on", async ({
+  initTestBed,
+  page,
+  createFormDriver,
+}) => {
+  await page.route("**/long-submit", (route) =>
+    route.fulfill({ status: 202, headers: { Location: "/runs/r1", "Content-Type": "application/json" }, body: JSON.stringify({ data: { id: "r1" } }) }),
+  );
+  await page.addInitScript(() => {
+    (window as any).xmluiFollowAccepted = async (_res: Response, request: { onProgress?: (p: unknown) => void }) => {
+      const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      request.onProgress?.({ type: "run", status: "running", done: 3, total: 10 });
+      await wait(1500);
+      request.onProgress?.({ type: "upload", loaded: 1, total: 2 }); // an upload's report is not the work's
+      request.onProgress?.({ type: "run", status: "running", done: 8, total: 10 });
+      await wait(1500);
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+  });
+  const { testStateDriver } = await initTestBed(`
+    <Form testId="form" submitUrl="/long-submit" submitMethod="post" onSuccess="testState = 'carried on'" data="{{ name: 'Lan' }}">
+      <FormItem label="Name" bindTo="name" />
+    </Form>
+  `);
+  const driver = await createFormDriver("form");
+  await driver.submitForm();
+  const status = page.getByTestId("form").getByRole("status");
+  await expect(status).toContainText("3 / 10");
+  await expect(status.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "30");
+  await expect(status).toContainText("8 / 10");
+  await expect(status.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "80");
+  await expect.poll(testStateDriver.testState).toEqual("carried on");
+  await expect(status).toHaveCount(0);
+});

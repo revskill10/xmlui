@@ -36,6 +36,21 @@ describe("RestApiProxy – 202 Accepted followed by the app", () => {
     expect(await proxy().execute({ operation: { url: "/api/items/export", method: "post" } })).toEqual({ data: { id: "run-3" } });
   });
 
+  it("passes the caller's progress listener to the follower: what it reports reaches the caller while it waits", async () => {
+    // A call with a progress listener goes through the upload-progress transport: stub it like fetch.
+    const p = proxy();
+    vi.spyOn(p as any, "executeWithUploadProgress").mockResolvedValue(json(202, { data: { id: "run-4" } }));
+    (globalThis as any).xmluiFollowAccepted = async (_res: Response, request: { onProgress?: (p: unknown) => void }) => {
+      request.onProgress?.({ type: "run", status: "running", done: 3, total: 10 });
+      request.onProgress?.({ type: "run", status: "running", done: 10, total: 10 });
+      return json(200, { exported: 10 });
+    };
+    const seen: unknown[] = [];
+    const result = await p.execute({ operation: { url: "/api/items/export", method: "post" }, onProgress: ((x: unknown) => seen.push(x)) as any });
+    expect(result).toEqual({ exported: 10 });
+    expect(seen).toEqual([{ type: "run", status: "running", done: 3, total: 10 }, { type: "run", status: "running", done: 10, total: 10 }]);
+  });
+
   it("leaves every other status alone", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(json(200, { ok: true }));
     const follow = vi.fn();

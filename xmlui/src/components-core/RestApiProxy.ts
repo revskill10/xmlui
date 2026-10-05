@@ -220,13 +220,15 @@ function isURLSameOrigin(url: string): boolean {
  * DataSource, Form) continues with that final response, as if the server had answered at once. Without one, a 202 is
  * handed over as it is. How "later" is reached (polling a job, a stream) is the app's protocol, not xmlui's.
  */
-async function followAccepted(response: Response, url: string, method: string, headers: Record<string, string> = {}): Promise<Response> {
+async function followAccepted(response: Response, url: string, method: string, headers: Record<string, string> = {},
+  onProgress?: (progress: unknown) => void): Promise<Response> {
   const follow = (globalThis as any).xmluiFollowAccepted as
-    | ((response: Response, request: { url: string; method: string; headers: Record<string, string> }) => Promise<Response>)
+    | ((response: Response, request: { url: string; method: string; headers: Record<string, string>; onProgress?: (progress: unknown) => void }) => Promise<Response>)
     | undefined;
   if (response?.status !== 202 || typeof follow !== "function") return response;
-  // The follower reaches the answer with the request's own credentials, against the request's own server.
-  return await follow(response, { url, method, headers });
+  // The follower reaches the answer with the request's own credentials, against the request's own server, and reports
+  // how far the work is to the caller's progress listener (the component shows it where the person acted).
+  return await follow(response, { url, method, headers, onProgress });
 }
 
 export default class RestApiProxy {
@@ -739,7 +741,7 @@ export default class RestApiProxy {
         options,
         onUploadProgress,
       });
-      response = await followAccepted(response, url, method, aggregatedHeaders);
+      response = await followAccepted(response, url, method, aggregatedHeaders, onUploadProgress as ((p: unknown) => void) | undefined);
       setLastApiStatus(transactionId, response?.status);
       if (!response.ok) {
         throw await this.raiseError(response);
@@ -759,7 +761,7 @@ export default class RestApiProxy {
       } else {
         response = await fetch(url, options);
       }
-      response = await followAccepted(response, url, method, aggregatedHeaders);
+      response = await followAccepted(response, url, method, aggregatedHeaders, onUploadProgress as ((p: unknown) => void) | undefined);
       if (!response.clone().ok) {
         throw await this.raiseError(response);
       }

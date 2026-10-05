@@ -48,3 +48,15 @@ $backgroundColor-buttonRow-Form: createThemeVar("backgroundColor-buttonRow-Form"
 :export {
   themeVars: t.json-stringify($themeVars);
 }
+
+// How far a submission answered "later" is (202 Accepted followed by the app), under the buttons while it lasts.
+.submitProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+}
+.submitProgressText {
+  font-size: 0.875em;
+  opacity: 0.8;
+}

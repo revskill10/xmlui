@@ -376,6 +376,12 @@ export const FormMd = createMetadata({
         `Available inside the form's \`onSubmit\` handler. Carries the resolved headers object ` +
         `built from the \`submitHeaders\` prop. \`undefined\` when the prop is not set.`,
     },
+    $formProgress: {
+      description:
+        `Available inside the form's \`onSubmit\` handler: pass it as \`onProgress\` to \`Actions.callApi\` to show ` +
+        `how far a submission answered "later" (202 Accepted, followed by the app) is, under the buttons — reports of ` +
+        `\`{ type: "run", done, total, note: { key, values } }\`. The built-in submit (\`submitUrl\`) passes it.`,
+    },
   },
   apis: {
     reset: {
