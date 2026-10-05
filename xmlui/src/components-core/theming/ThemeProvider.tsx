@@ -312,7 +312,8 @@ function compileTheme(
     return [resultedTheme, invalidNames, layerDiagnostics];
   })();
 
-  const knownThemeVarNames = (() => {
+  // Only strict theming validates names: built when it does (213 ms per page load otherwise spent for nothing).
+  const knownThemeVarNames = () => {
     const known = new Set(declaredThemeVarNames);
     themeDefChainVars?.forEach((theme) => {
       const generated = {
@@ -328,7 +329,7 @@ function compileTheme(
       Object.keys(generated).forEach((key) => addKnownThemeVarName(known, key));
     });
     return known;
-  })();
+  };
 
   const [allThemeVarsWithResolvedHierarchicalVars, rawAllThemeVars, invalidThemeVarNames] = (() => {
     let mergedThemeVars: Record<string, string> = {};
@@ -361,6 +362,7 @@ function compileTheme(
     };
 
     if (strictTheming) {
+      const knownNames = knownThemeVarNames();
       const resolvedForValidation = new Map<string, string>();
       Object.keys(rawVars).forEach((key) => {
         resolvedForValidation.set(key, resolveThemeVar(key, rawVars));
@@ -368,12 +370,12 @@ function compileTheme(
       const allDiags = validateTheme(
         resolvedForValidation,
         componentThemeVarDeclarations,
-        { strict: !!strictTheming, knownNames: knownThemeVarNames, includeDerived: true },
+        { strict: !!strictTheming, knownNames, includeDerived: true },
       );
       const displayDiags = validateTheme(
         resolvedForValidation,
         componentThemeVarDeclarations,
-        { strict: !!strictTheming, knownNames: knownThemeVarNames },
+        { strict: !!strictTheming, knownNames },
       );
       emitThemeDiagnostics([...layerThemeDiagnostics, ...displayDiags]);
       const errorVarNames = new Set(

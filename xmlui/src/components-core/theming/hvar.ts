@@ -84,14 +84,13 @@ export type ThemeVarMatchResult = {
   from: Array<string>;
 };
 
-export function matchThemeVar(
-  themeVar: string,
-  availableThemeVars: Array<Record<string, string>> = []
-): ThemeVarMatchResult | undefined {
-  const hvar = parseHVar(themeVar);
-  if (!hvar) {
-    return;
-  }
+/** The names a theme variable can take its value from, most specific first: they depend on the name alone, so they are
+ *  built once per name (a theme compile matches thousands of names, a page compiles several themes). Shared and
+ *  read-only. */
+const candidateNamesCache = new Map<string, ReadonlyArray<string>>();
+function candidateNames(themeVar: string, hvar: HVar): Array<string> {
+  const known = candidateNamesCache.get(themeVar);
+  if (known) return known as Array<string>;
   const stateCombinations = createCombinations(hvar.states);
   const traitCombinations = createCombinations(hvar.traits);
 
@@ -125,6 +124,19 @@ export function matchThemeVar(
     });
   });
 
+  candidateNamesCache.set(themeVar, Object.freeze(from));
+  return from;
+}
+
+export function matchThemeVar(
+  themeVar: string,
+  availableThemeVars: Array<Record<string, string>> = []
+): ThemeVarMatchResult | undefined {
+  const hvar = parseHVar(themeVar);
+  if (!hvar) {
+    return;
+  }
+  const from = candidateNames(themeVar, hvar);
   let matchedValue;
   for (let i = availableThemeVars.length - 1; i >= 0; i--) {
     const themeVars = availableThemeVars[i];

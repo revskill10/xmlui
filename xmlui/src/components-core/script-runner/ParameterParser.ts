@@ -25,8 +25,36 @@ export function parseParameterString(
   source: string,
   options: ParseBindingOptions = {},
 ): (StringLiteralSection | ExpressionSection)[] {
+  if (source === undefined || source === null) return [];
+  // --- The same binding text parses to the same sections: parse it once. Only without compile options (the sections
+  // --- then depend on the text alone); each caller gets its own array (some trim it), the parsed trees are shared
+  // --- read-only (nothing writes into them).
+  const cacheable = typeof source === "string" && isDefaultOptions(options);
+  if (cacheable) {
+    const hit = parsedParameters.get(source);
+    if (hit) return hit.slice();
+  }
+  const result = parseParameterStringUncached(source, options);
+  if (cacheable) {
+    if (parsedParameters.size >= PARSED_PARAMETERS_MAX) parsedParameters.delete(parsedParameters.keys().next().value!);
+    parsedParameters.set(source, result);
+    return result.slice();
+  }
+  return result;
+}
+
+const PARSED_PARAMETERS_MAX = 20_000;
+const parsedParameters = new Map<string, (StringLiteralSection | ExpressionSection)[]>();
+function isDefaultOptions(options: ParseBindingOptions): boolean {
+  for (const key in options) if ((options as Record<string, unknown>)[key] !== undefined) return false;
+  return true;
+}
+
+function parseParameterStringUncached(
+  source: string,
+  options: ParseBindingOptions,
+): (StringLiteralSection | ExpressionSection)[] {
   const result: (StringLiteralSection | ExpressionSection)[] = [];
-  if (source === undefined || source === null) return result;
 
   let phase = ParsePhase.StringLiteral;
   let section = "";
