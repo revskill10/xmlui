@@ -260,6 +260,15 @@ export function generatePaddingSegments(theme?: Record<string, string>) {
   if (!theme) {
     return {};
   }
+  const known = generatePaddingSegmentsCache.get(theme);
+  if (known) return known;
+  const segmented = generatePaddingSegmentsUncached(theme);
+  generatePaddingSegmentsCache.set(theme, segmented);
+  return segmented;
+}
+/** Per input object (layers are shared and read-only; callers only read or spread the result). */
+const generatePaddingSegmentsCache = new WeakMap<Record<string, string>, Record<string, string>>();
+function generatePaddingSegmentsUncached(theme: Record<string, string>) {
   const result = { ...theme };
 
   // --- Iterate through theme variables and split padding values
@@ -358,6 +367,15 @@ export function generateBorderSegments(theme?: Record<string, string>) {
   if (!theme) {
     return {};
   }
+  const known = generateBorderSegmentsCache.get(theme);
+  if (known) return known;
+  const segmented = generateBorderSegmentsUncached(theme);
+  generateBorderSegmentsCache.set(theme, segmented);
+  return segmented;
+}
+/** Per input object (layers are shared and read-only; callers only read or spread the result). */
+const generateBorderSegmentsCache = new WeakMap<Record<string, string>, Record<string, string>>();
+function generateBorderSegmentsUncached(theme: Record<string, string>) {
   const result = { ...theme };
 
   // --- Iterate through theme variables and split border values

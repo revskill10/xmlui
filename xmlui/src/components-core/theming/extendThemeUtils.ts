@@ -28,6 +28,16 @@ export function collectThemeChainByExtends(
   allThemes: Array<ThemeDefinition>,
   componentDefaultThemeVars: DefaultThemeVars,
 ) {
+  return [rootThemeLayer(componentDefaultThemeVars), ...collectExtends(customTheme, allThemes), customTheme];
+}
+
+/** The root layer — the root theme plus every component's default variables (thousands) — depends on the component
+ *  registry's defaults alone: built once per registry and shared (read-only), so a theme compile's per-layer work
+ *  for it is cached too (it was rebuilt, and revalidated, for every Theme on every page). */
+const rootThemeLayers = new WeakMap<object, ThemeDefinition>();
+function rootThemeLayer(componentDefaultThemeVars: DefaultThemeVars): ThemeDefinition {
+  const known = rootThemeLayers.get(componentDefaultThemeVars);
+  if (known) return known;
   const rootThemeVars: Record<string, string> = cloneDeep(RootThemeDefinition.themeVars) || {};
   const rootTones: Record<string | ThemeTone, ThemeDefinitionDetails> = cloneDeep(RootThemeDefinition.tones) || {};
   Object.entries(componentDefaultThemeVars).forEach(([key, value]) => {
@@ -52,5 +62,6 @@ export function collectThemeChainByExtends(
     resources: {},
     tones: rootTones,
   };
-  return [root, ...collectExtends(customTheme, allThemes), customTheme];
+  rootThemeLayers.set(componentDefaultThemeVars, root);
+  return root;
 }

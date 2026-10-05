@@ -32,3 +32,21 @@ describe("compiled theme cache", () => {
     expect(compiled(registry, nested("t1", { "width-Drawer": "28rem" }), "light", [base], resources, resourceMap, true, false)).not.toBe(a);
   });
 });
+
+// The layers a compile shares (the root layer, the base theme) are prepared once per registry and reused by every
+// compile that inherits them: each compile still keeps the base's invalid value out and its own overrides in.
+describe("shared theme layers", () => {
+  it("a base theme's invalid value stays out of every compile that inherits it; each keeps its own overrides", () => {
+    const strictRegistry = { componentThemeVars: new Set<string>(), componentDefaultThemeVars: {}, componentThemeVarDeclarations: new Map() } as any;
+    const broken = { id: "broken", themeVars: { "color-primary": "#1677ff", "fontSize-Text": "not a size" } } as any;
+    const list = [broken];
+    const one = compiled(strictRegistry, { id: "n1", extends: "broken", tones: { light: { themeVars: { "width-Drawer": "1rem" } } } } as any, "light", list, resources, resourceMap, true, false);
+    const two = compiled(strictRegistry, { id: "n2", extends: "broken", tones: { light: { themeVars: { "width-Drawer": "2rem" } } } } as any, "light", list, resources, resourceMap, true, false);
+    for (const c of [one, two]) {
+      expect(c.invalidThemeVarNames.has("fontSize-Text")).toBe(true);
+      expect(c.allThemeVarsWithResolvedHierarchicalVars["fontSize-Text"]).toBeUndefined();
+    }
+    expect(one.allThemeVarsWithResolvedHierarchicalVars["width-Drawer"]).toBe("1rem");
+    expect(two.allThemeVarsWithResolvedHierarchicalVars["width-Drawer"]).toBe("2rem");
+  });
+});

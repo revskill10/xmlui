@@ -164,6 +164,22 @@ function cachedCompiledTheme(
 /** Exported for tests: identical inputs compile to the very same object. */
 export const __compiledThemeForTests = cachedCompiledTheme;
 
+/** Names every theme may set: the root theme's, the components' declared and default ones — per registry. */
+const declaredNamesCache = new WeakMap<object, Set<string>>();
+function declaredNamesOf(componentRegistry: ReturnType<typeof useComponentRegistry>): Set<string> {
+  let known = declaredNamesCache.get(componentRegistry as object);
+  if (!known) {
+    const { componentThemeVars, componentDefaultThemeVars } = componentRegistry;
+    known = new Set<string>();
+    Object.keys(themeVars.themeVars).forEach((name) => addKnownThemeVarName(known!, name));
+    componentThemeVars.forEach((name) => addKnownThemeVarName(known!, name));
+    collectThemeVarKeys(componentDefaultThemeVars).forEach((name) => addKnownThemeVarName(known!, name));
+    declaredNamesCache.set(componentRegistry as object, known);
+  }
+  return known;
+}
+const layerVarsCache = new WeakMap<object, WeakMap<ThemeDefinition, Map<string, { vars: Record<string, string>; invalid: Set<string>; diagnostics: Array<ThemeDiagnostic> }>>>();
+
 function compileTheme(
   componentRegistry: ReturnType<typeof useComponentRegistry>,
   activeTheme: ThemeDefinition | undefined,
@@ -230,23 +246,17 @@ function compileTheme(
     return (allFonts?.filter((theme) => typeof theme === "string") || []) as Array<string>;
   })();
 
-  const declaredThemeVarNames = (() => {
-    const known = new Set<string>();
-    Object.keys(themeVars.themeVars).forEach((name) => addKnownThemeVarName(known, name));
-    componentThemeVars.forEach((name) => addKnownThemeVarName(known, name));
-    collectThemeVarKeys(componentDefaultThemeVars).forEach((name) => addKnownThemeVarName(known, name));
-    return known;
-  })();
-
-  const [themeDefChainVars, layerInvalidThemeVarNames, layerThemeDiagnostics] = (() => {
-    if (!themeDefChain?.length) {
-      return [[], new Set<string>(), []];
-    }
-    let mergedThemeVars = {};
-    const invalidNames = new Set<string>();
-    const layerDiagnostics: Array<ThemeDiagnostic> = [];
-    themeDefChain?.forEach((theme) => {
-      const themeVarsForTone = sanitizeThemeVarsForStrictTheming(
+  const declaredThemeVarNames = declaredNamesOf(componentRegistry);
+  // One layer's variables in this tone, sanitized: cached per layer object (base layers are shared), the names and
+  // diagnostics it reports replayed into this compile's collections.
+  const layerVars = (theme: ThemeDefinition, invalidNames: Set<string>, diagnostics: Array<ThemeDiagnostic>) => {
+    const slot = `${activeTone}|${!!strictTheming}`;
+    let perLayer = layerVarsCache.get(componentRegistry as object)?.get(theme);
+    let known = perLayer?.get(slot);
+    if (!known) {
+      const layerInvalid = new Set<string>();
+      const layerDiagnostics: Array<ThemeDiagnostic> = [];
+      const vars = sanitizeThemeVarsForStrictTheming(
         {
           ...omit(theme.themeVars, "light", "dark"),
           ...(theme.themeVars?.[activeTone] as unknown as Record<string, string>),
@@ -255,9 +265,30 @@ function compileTheme(
         strictTheming,
         componentThemeVarDeclarations,
         declaredThemeVarNames,
-        invalidNames,
+        layerInvalid,
         layerDiagnostics,
       );
+      known = { vars, invalid: layerInvalid, diagnostics: layerDiagnostics };
+      let byLayer = layerVarsCache.get(componentRegistry as object);
+      if (!byLayer) { byLayer = new WeakMap(); layerVarsCache.set(componentRegistry as object, byLayer); }
+      if (!perLayer) { perLayer = new Map(); byLayer.set(theme, perLayer); }
+      perLayer.set(slot, known);
+    }
+    known.invalid.forEach((name) => invalidNames.add(name));
+    diagnostics.push(...known.diagnostics);
+    return known.vars;
+  };
+
+  const [themeDefChainVars, layerInvalidThemeVarNames, layerThemeDiagnostics] = (() => {
+    if (!themeDefChain?.length) {
+      return [[], new Set<string>(), []];
+    }
+    let mergedThemeVars = {};
+    const invalidNames = new Set<string>();
+    const layerDiagnostics: Array<ThemeDiagnostic> = [];
+    // Each layer once per compile (its diagnostics reported once); the list below reuses these.
+    const layers = themeDefChain.map((theme) => layerVars(theme, invalidNames, layerDiagnostics));
+    layers.forEach((themeVarsForTone) => {
       mergedThemeVars = {
         ...mergedThemeVars,
         ...themeVarsForTone,
@@ -266,22 +297,7 @@ function compileTheme(
 
     //we put the generated theme vars before the last item in the chain
     const resultedTheme = [
-      ...themeDefChain
-        .map((themeDef) =>
-          sanitizeThemeVarsForStrictTheming(
-            {
-              ...omit(themeDef.themeVars, "light", "dark"),
-              ...(themeDef.themeVars?.[activeTone] as unknown as Record<string, string>),
-              ...themeDef.tones?.[activeTone]?.themeVars,
-            },
-            strictTheming,
-            componentThemeVarDeclarations,
-            declaredThemeVarNames,
-            invalidNames,
-            layerDiagnostics,
-          ),
-        )
-        .slice(0, themeDefChain.length - 1),
+      ...layers.slice(0, themeDefChain.length - 1),
       {
         ...generateBootstrapBaseColumns(mergedThemeVars),
         ...generateBaseSpacings(mergedThemeVars),
@@ -292,22 +308,7 @@ function compileTheme(
         ...generateBaseFontSizes(mergedThemeVars),
         ...generateTextFontSizes(mergedThemeVars),
       },
-      sanitizeThemeVarsForStrictTheming(
-        {
-          ...omit(themeDefChain[themeDefChain.length - 1].themeVars, "light", "dark"),
-          //...generateTextFontSizes(mergedThemeVars),
-          ...(themeDefChain[themeDefChain.length - 1].themeVars?.[activeTone] as unknown as Record<
-            string,
-            string
-          >),
-          ...themeDefChain[themeDefChain.length - 1].tones?.[activeTone]?.themeVars,
-        },
-        strictTheming,
-        componentThemeVarDeclarations,
-        declaredThemeVarNames,
-        invalidNames,
-        layerDiagnostics,
-      ),
+      layers[themeDefChain.length - 1],
     ];
     return [resultedTheme, invalidNames, layerDiagnostics];
   })();
